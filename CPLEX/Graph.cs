@@ -7,9 +7,9 @@ namespace MaxClique
 {
 	public struct Graph : IEnumerable<Edge>
     {
-		public HashSet<Edge> Edges { get; }
+		public ISet<Edge> Edges { get; }
 
-		public Graph(Edge[] edges)
+		public Graph(IEnumerable<Edge> edges)
         {
 			Edges = new HashSet<Edge>(edges);
         }
@@ -42,7 +42,7 @@ namespace MaxClique
 					.ToArray();
 		}
         
-		public int GetMinVertex(){
+		public int GetMinDegreeVertex(){
 			var graph = this;
 			return GetVertices().Min(x => graph.GetNeighbours(x).Length);
 		}
