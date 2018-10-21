@@ -34,6 +34,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ILOG.Concert">
+      <HintPath>..\..\..\IBM\ILOG\CPLEX_Studio_Community128\cplex\bin\x64_win64\ILOG.Concert.dll</HintPath>
+    </Reference>
+    <Reference Include="ILOG.CPLEX">
+      <HintPath>..\..\..\IBM\ILOG\CPLEX_Studio_Community128\cplex\bin\x64_win64\ILOG.CPLEX.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -42,29 +48,27 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="ILOG.Concert">
-      <HintPath>bin\Debug\ILOG.Concert.dll</HintPath>
-    </Reference>
-    <Reference Include="ILOG.CPLEX">
-      <HintPath>bin\Debug\ILOG.CPLEX.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="App.cs" />
     <Compile Include="LP.cs" />
+    <Compile Include="NewGraph.cs" />
+    <Compile Include="GraphNode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SimplexSolver.cs" />
+    <Compile Include="CplexSolver.cs" />
     <Compile Include="Graph.cs" />
     <Compile Include="Edge.cs" />
     <Compile Include="GraphParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="hamming6-2.clq">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="c-fat200-2 %28copy%29.clq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="C125.9.clq" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="custom.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

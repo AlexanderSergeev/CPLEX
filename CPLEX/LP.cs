@@ -5,14 +5,14 @@ using MaxClique;
 
 public class LP
 {
-	public static void Main(string[] args)
+	/*public static void Main(string[] args)
 	{
 		var graph = GraphParser.Parse("c-fat200-2 (copy).clq");
 		var removedVertices = new List<int>();
 		var result = MaxClique(graph, new int[0]);
 		result.All(x => { Console.WriteLine(x); return true; });
 		Console.ReadKey(false);
-	}
+	}*/
 
 	static int[] MaxClique(Graph graph, int[] clique)
 	{
