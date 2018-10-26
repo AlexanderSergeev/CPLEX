@@ -107,7 +107,8 @@ namespace CPLEX
             if (cplex.Solve())
             {
                 // this branch won't give us better result than existing one
-                if (maxClique.Count > Math.Floor(cplex.GetObjValue()))
+                var objValue = Math.Floor(cplex.GetObjValue());
+                if (maxClique.Count > objValue)
                 {
                     return;
                 }
