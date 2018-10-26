@@ -96,19 +96,19 @@ namespace CPLEX
             }
         }
 
-        public List<GraphNode> FindMaxClique()
+        public List<GraphNode> FindMaxClique(int ub)
         {
-            FindCliqueInternal();
+            FindCliqueInternal(ub);
             return maxClique;
         }
 
-        private void FindCliqueInternal()
+        private void FindCliqueInternal(int ub)
         {
             if (cplex.Solve())
             {
                 // this branch won't give us better result than existing one
                 var objValue = Math.Floor(cplex.GetObjValue());
-                if (maxClique.Count > objValue)
+                if (ub > objValue)
                 {
                     return;
                 }
@@ -142,6 +142,7 @@ namespace CPLEX
                     if (maxClique.Count < possibleMaxClique.Count)
                     {
                         maxClique = possibleMaxClique;
+                        ub = maxClique.Count;
                     }
                 }
                 else
@@ -150,12 +151,12 @@ namespace CPLEX
                     INumVar newVar;
                     vars.TryGetValue(firstFractalIndex + 1, out newVar);
                     IRange newBranchConstraint = cplex.AddGe(newVar, 1);
-                    FindCliqueInternal();
+                    FindCliqueInternal(ub);
                     cplex.Remove(newBranchConstraint);
 
                     vars.TryGetValue(firstFractalIndex + 1, out newVar);
                     newBranchConstraint = cplex.AddLe(newVar, 0);
-                    FindCliqueInternal();
+                    FindCliqueInternal(ub);
                     cplex.Remove(newBranchConstraint);
                 }
             }
