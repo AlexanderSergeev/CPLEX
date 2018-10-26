@@ -33,7 +33,7 @@ namespace CPLEX
             string s="";
             foreach(var n in neighbours)
             {
-                s = s + n.index.ToString();
+                s = s +","+ n.index.ToString();
             }
             return s;
         }

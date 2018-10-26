@@ -34,11 +34,13 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ILOG.Concert">
-      <HintPath>..\..\..\IBM\ILOG\CPLEX_Studio_Community128\cplex\bin\x64_win64\ILOG.Concert.dll</HintPath>
+    <Reference Include="ILOG.Concert, Version=12.8.0.0, Culture=neutral, PublicKeyToken=7906592bc7cc7340, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\IBM\ILOG\CPLEX_Studio128\cplex\bin\x64_win64\ILOG.Concert.dll</HintPath>
     </Reference>
-    <Reference Include="ILOG.CPLEX">
-      <HintPath>..\..\..\IBM\ILOG\CPLEX_Studio_Community128\cplex\bin\x64_win64\ILOG.CPLEX.dll</HintPath>
+    <Reference Include="ILOG.CPLEX, Version=12.8.0.0, Culture=neutral, PublicKeyToken=7906592bc7cc7340, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\IBM\ILOG\CPLEX_Studio128\cplex\bin\x64_win64\ILOG.CPLEX.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
