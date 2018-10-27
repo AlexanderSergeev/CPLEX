@@ -35,10 +35,10 @@ namespace CPLEX
             // objective function -> max
             InitializeObjFunc();
 
-            // add obvious constraints on nodes which are not connected
+            // add constraints on nodes which are not connected
             AddPrimitiveConstraints();
 
-            // add constraints based on independent sets
+            // add constraints based on independent sets (graph coloring greedy algorithm)
             AddIndependentSetsConstraints();
         }
 
@@ -106,7 +106,7 @@ namespace CPLEX
         {
             CallsCount++;
             if (!cplex.Solve()) return;
-            // this branch won't give us better result than existing one
+            // this branch won't give us better results than the existing one
             var objValue = Math.Floor(cplex.GetObjValue());
             if (lb > objValue || Math.Abs(lb - objValue) < EPS)
             {
@@ -118,27 +118,30 @@ namespace CPLEX
             var possibleMaxClique = new List<GraphNode>();
             for (var d = 0; d < varsValues.Length; d++)
             {
-                // if fractional var is found - doing branching basing on it
+                // if fractional var is found - doing branching with it
                 if (Math.Abs(varsValues[d] % 1) > EPS)
                 {
                     firstFractalIndex = d;
                     break;
                 }
 
-                // until we found fractal value of some var - it is potentially a clique
+                // until we found fractional value of some var - it is potentially a clique
                 if (Math.Abs(varsValues[d] - 1.0) < EPS)
+                {
                     if (maxClique.Count < possibleMaxClique.Count)
                     {
                         maxClique = possibleMaxClique;
                         lb = maxClique.Count;
                     }
+                }
                 var nodes = graph.GetNodes();
-                var node = nodes.ElementAt(d).Value;
+                GraphNode node;
+                nodes.TryGetValue(d, out node);
                 possibleMaxClique.Add(node);
             }
 
             // it is an integer solution
-            // if possible max clique is bigger then previous one - we found new max clique
+            // if possible max clique is bigger than the previous one - we found a new max clique
             if (firstFractalIndex == -1)
             {
                 if (maxClique.Count < possibleMaxClique.Count)
@@ -183,7 +186,7 @@ namespace CPLEX
         private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(List<GraphNode> graphNodes)
         {
             var maxColor = 0;
-            // contains sets with vertexes of the same color. Key - color number, value - set of nodes of this color
+            // contains sets with vertices of the same color. Key - color number, value - set of nodes of this color
             var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
             var colors = new Dictionary<int, int>();
             var nodes = graphNodes.OrderByDescending(o => o.GetNeighbours().Count).ToList();
