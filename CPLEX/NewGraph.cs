@@ -7,6 +7,11 @@ namespace CPLEX
     {
         public List<GraphNode> Nodes { get; }
 
+        public GraphNode this[int index]
+        {
+            get { return Nodes.First(node => node.Index == index); }
+        }
+
         public NewGraph()
         {
             Nodes = new List<GraphNode>();
@@ -27,7 +32,7 @@ namespace CPLEX
                 Nodes.Add(new GraphNode(index));
             }
 
-            return Nodes.First(node => node.Index == index);
+            return this[index];
         }
     }
 }

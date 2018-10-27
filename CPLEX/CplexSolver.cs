@@ -20,7 +20,7 @@ namespace CPLEX
             this.graph = graph;
             maxClique = new List<GraphNode>();
             cplex = new Cplex();
-            vars = graph.Nodes.Select(node => cplex.NumVar(0, 1, $"{node}n")).ToArray();
+            vars = graph.Nodes.Select(node => cplex.NumVar(0, 1, $"x{node}")).ToArray();
 
             Initialize();
         }
@@ -63,7 +63,7 @@ namespace CPLEX
                     anotherNodeIndex <= graph.Nodes.Count;
                     anotherNodeIndex++)
                 {
-                    var anotherNodeValue = graph.Nodes.First(n => n.Index == anotherNodeIndex);
+                    var anotherNodeValue = graph[anotherNodeIndex];
                     if (!node.Neighbours.Contains(anotherNodeValue))
                     {
                         var indexVar = vars[node.Index - 1];
@@ -98,8 +98,7 @@ namespace CPLEX
             {
                 return;
             }
-            var numVars = vars.ToArray();
-            var values = cplex.GetValues(numVars);
+            var values = cplex.GetValues(vars);
             var firstFractalIndex = -1;
             var possibleMaxClique = new List<GraphNode>();
             for (var i = 0; i < values.Length; i++)
