@@ -1,20 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CPLEX
 {
     class Heuristic
     {
         private NewGraph graph;
-        private List<GraphNode> maxClique;
+        public List<GraphNode> maxClique;
 
         public Heuristic(NewGraph graph)
         {
             this.graph = graph;
-            this.maxClique = new List<GraphNode>();
+            maxClique = new List<GraphNode>();
         }
 
         public List<GraphNode> FindMaxClique()
@@ -24,13 +22,8 @@ namespace CPLEX
             // Sorting by color number - color number for node shows number of adjacent with each other vertices
             // and we are interested only in nodes with a lot of such neighbours.
             SortByColor(nodes, colors);
-
+            int chromaticNumber = colors.Values.Distinct().Count();
             BranchAndBound(nodes, new List<GraphNode>(), colors);
-            return GetMaxClique();
-        }
-
-        public List<GraphNode> GetMaxClique()
-        {
             return maxClique;
         }
 
@@ -38,8 +31,9 @@ namespace CPLEX
         {
             foreach (GraphNode c in candidates)
             {
+                var colorValue = GetColorValue(c, colors);
                 // we can predict if node cannot expand current max clique
-                if (clique.Count + colors.ElementAt(c.GetIndex()).Value <= GetMaxClique().Count)
+                if (clique.Count + colorValue <= maxClique.Count)
                 { // |Q|+|R| > |Qmax|
                   // and as nodes are sorted by color number, we don't need to verify further nodes
                   // so just exit this branch
@@ -62,7 +56,7 @@ namespace CPLEX
                     SortByColor(currentCandidates, candidateColors);
                     BranchAndBound(currentCandidates, currentClique, candidateColors);
                 }
-                else if (currentClique.Count > GetMaxClique().Count)
+                else if (currentClique.Count > maxClique.Count)
                 {
                     maxClique = currentClique;
                 }
@@ -81,7 +75,7 @@ namespace CPLEX
         {
             // It is better for us to have small color for nodes with a little number of neighbours
             // In this case using |Q|+|R| > |Qmax| we will reject nodes with big number of neighbours
-            //nodes.Sort(Comparer.<GraphNode> comparingInt(elem=>elem.getNeighbours().size()).reversed());
+            nodes = nodes.OrderByDescending(o => o.GetNeighbours().Count).ToList();
             int maxColor = 0;
             // contains sets with vertexes of the same color. Key - color number, value - set of nodes of this color
             Dictionary<int, HashSet<GraphNode>> colorsSets = new Dictionary<int, HashSet<GraphNode>>();
@@ -94,14 +88,22 @@ namespace CPLEX
                 while (true)
                 {
                     // Get all nodes of current K color
-                    HashSet<GraphNode> nodesOfCurrentColor = colorsSets.ElementAt(k).Value != null ?
-                            new HashSet<GraphNode>(colorsSets.ElementAt(k).Value) : new HashSet<GraphNode>();
+                    HashSet<GraphNode> kColorNodes;
+                    colorsSets.TryGetValue(k, out kColorNodes);
+                    HashSet<GraphNode> nodesOfCurrentColor = kColorNodes != null ? kColorNodes : new HashSet<GraphNode>();
+                    HashSet<GraphNode> neigboursOfCurrentColor = new HashSet<GraphNode>();
 
                     // And try to find neighbours with this color
-                    nodesOfCurrentColor.Intersect(node.GetNeighbours());
+                    foreach (GraphNode neigbour in node.GetNeighbours())
+                    {
+                        if (nodesOfCurrentColor.Contains(neigbour))
+                        {
+                            neigboursOfCurrentColor.Add(neigbour);
+                        }
+                    }
 
                     // if none - great, current K is suitable for coloring current node
-                    if (!nodesOfCurrentColor.Any())
+                    if (neigboursOfCurrentColor.Count==0)
                     {
                         break;
                     }
@@ -115,16 +117,27 @@ namespace CPLEX
                     // New color, so create a new set for nodes
                     colorsSets.Add(k, new HashSet<GraphNode>());
                 }
-                colorsSets.ElementAt(k).Value.Add(node);
+                HashSet<GraphNode> colorSetNodes = new HashSet<GraphNode>();
+                colorsSets.TryGetValue(k, out colorSetNodes);
+                colorSetNodes.Add(node);
+                colorsSets.Remove(k);
+                colorsSets.Add(k, colorSetNodes);
                 colors.Add(node.GetIndex(), k);
             }
 
             return colors;
         }
 
+        private int GetColorValue(GraphNode o, Dictionary<int, int> colors)
+        {
+            int colorValue;
+            colors.TryGetValue(o.GetIndex(), out colorValue);
+            return colorValue;
+        }
+
         private void SortByColor(List<GraphNode> collection, Dictionary<int, int> colors)
         {
-       //     collection.sort(Comparator.<GraphNode> comparingInt(left=>colors.get(left.getIndex())).reversed());
+            collection = collection.OrderByDescending(o => GetColorValue(o, colors)).ToList();
         }
     }
 }

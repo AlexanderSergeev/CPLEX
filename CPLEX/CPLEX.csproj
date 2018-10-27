@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App.cs" />
+    <Compile Include="Heuristic.cs" />
     <Compile Include="LP.cs" />
     <Compile Include="NewGraph.cs" />
     <Compile Include="GraphNode.cs" />
