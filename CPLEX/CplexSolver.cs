@@ -27,7 +27,7 @@ namespace CPLEX
 
         private void Initialize()
         {
-            cplex.SetOut(Console.Out);
+            cplex.SetOut(null);
 
             // objective function -> max
             InitializeObjFunc();
@@ -122,7 +122,7 @@ namespace CPLEX
             // if possible max clique is bigger then previous one - we found new max clique
             if (firstFractalIndex == -1)
             {
-                possibleMaxClique.All(x => { Console.WriteLine(x.Index); return true; });
+                Console.WriteLine($"Current clique: {string.Join(", ", possibleMaxClique.Select(x=>x.Index))}");
                 if (possibleMaxClique.Count <= upperBound) return;
                 maxClique = possibleMaxClique;
                 upperBound = maxClique.Count;
