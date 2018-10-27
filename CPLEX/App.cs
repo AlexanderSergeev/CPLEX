@@ -7,11 +7,11 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var graph = GraphParser.ParseNewGraph("c-fat200-2 (copy).clq");
-        var upperBound = 0;
+        var graph = GraphParser.ParseNewGraph("D:/VSProjects/CPLEX/CPLEX/C125.9.clq");
         var algorithm = new CplexSolver(graph); 
-        var result = algorithm.FindMaxClique(upperBound);
-        result.All(x => { Console.WriteLine(x.ToString()); return true; });
+        var result = algorithm.FindMaxClique();
+        result.All(x => { Console.WriteLine(x); return true; });
+        Console.WriteLine($"Calls: {algorithm.CallsCount}");
         Console.ReadKey(false);
     }
 }

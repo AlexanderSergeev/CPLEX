@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace CPLEX
 {
@@ -28,20 +29,10 @@ namespace CPLEX
             return neighbours;
         }
 
-        public string GetNeighboursString()
-        {
-            string s="";
-            foreach(var n in neighbours)
-            {
-                s = s +","+ n.index.ToString();
-            }
-            return s;
-        }
-
         public override string ToString()
         {
-            return index.ToString() + "-neigbours:" + GetNeighboursString();
-        } 
+            return $"{index}\tneigbours:{string.Join(",", neighbours.Select(n => n.index))}";
+        }
     }
 }
 
