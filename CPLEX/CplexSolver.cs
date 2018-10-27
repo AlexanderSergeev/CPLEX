@@ -131,7 +131,8 @@ namespace CPLEX
                         upperBound = maxClique.Count;
                     }
                 var nodes = graph.GetNodes();
-                var node = nodes.ElementAt(d).Value;
+                GraphNode node;
+                nodes.TryGetValue(d, out node);
                 possibleMaxClique.Add(node);
             }
 
