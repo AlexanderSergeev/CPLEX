@@ -97,23 +97,18 @@ namespace CPLEX
         public List<GraphNode> FindMaxClique()
         {
             List<GraphNode> nodes = new List<GraphNode>(graph.GetNodes().Values);
-            Dictionary<int, int> colors = FindChromaticNumber(nodes);
-            // Sorting by color number - color number for node shows number of adjacent with each other vertices
-            // and we are interested only in nodes with a lot of such neighbours.
-            SortByColor(nodes, colors);
-            int chromaticNumber = colors.Values.Distinct().Count();
             int lb = 0;
-            FindCliqueInternal(chromaticNumber, lb);
+            FindCliqueInternal(lb);
             return maxClique;
         }
 
-        private void FindCliqueInternal(int chromaticNumber, int lb)
+        private void FindCliqueInternal(int lb)
         {
             CallsCount++;
             if (!cplex.Solve()) return;
             // this branch won't give us better result than existing one
             var objValue = Math.Floor(cplex.GetObjValue());
-            if (chromaticNumber < objValue || lb > objValue || Math.Abs(lb - objValue) < EPS)
+            if (lb > objValue || Math.Abs(lb - objValue) < EPS)
             {
                 return;
             }
@@ -152,12 +147,12 @@ namespace CPLEX
                     INumVar newVar;
                     vars.TryGetValue(firstFractalIndex + 1, out newVar);
                     IRange newBranchConstraint = cplex.AddGe(newVar, 1);
-                    FindCliqueInternal(chromaticNumber, lb);
+                    FindCliqueInternal(lb);
                     cplex.Remove(newBranchConstraint);
 
                     vars.TryGetValue(firstFractalIndex + 1, out newVar);
                     newBranchConstraint = cplex.AddLe(newVar, 0);
-                    FindCliqueInternal(chromaticNumber, lb);
+                    FindCliqueInternal(lb);
                     cplex.Remove(newBranchConstraint);
 
                     maxClique = possibleMaxClique;
@@ -170,12 +165,12 @@ namespace CPLEX
                 INumVar newVar;
                 vars.TryGetValue(firstFractalIndex + 1, out newVar);
                 var newBranchConstraint = cplex.AddGe(newVar, 1);
-                FindCliqueInternal(chromaticNumber, lb);
+                FindCliqueInternal(lb);
                 cplex.Remove(newBranchConstraint);
 
                 vars.TryGetValue(firstFractalIndex + 1, out newVar);
                 newBranchConstraint = cplex.AddLe(newVar, 0);
-                FindCliqueInternal(chromaticNumber, lb);
+                FindCliqueInternal(lb);
                 cplex.Remove(newBranchConstraint);
             }
         }
@@ -185,12 +180,13 @@ namespace CPLEX
             return maxClique;
         }
 
-        private static Dictionary<int, List<GraphNode>> GetIndependentSets(List<GraphNode> nodes)
+        private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(List<GraphNode> graphNodes)
         {
             var maxColor = 0;
             // contains sets with vertexes of the same color. Key - color number, value - set of nodes of this color
-            var colorsSets = new Dictionary<int, List<GraphNode>>();
+            var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
             var colors = new Dictionary<int, int>();
+            var nodes = graphNodes.OrderByDescending(o => o.GetNeighbours().Count).ToList();
 
             foreach (var node in nodes)
             {
@@ -199,16 +195,18 @@ namespace CPLEX
                 while (true)
                 {
                     // Get all nodes of current K color
-                    List<GraphNode> nodeSet;
+                    HashSet<GraphNode> nodeSet;
                     if (!colorsSets.TryGetValue(k, out nodeSet))
-                        nodeSet = new List<GraphNode>();
+                        nodeSet = new HashSet<GraphNode>();
 
                     // And try to find neighbours with this color
-                    var nodesOfCurrentColor = new List<GraphNode>();
+                    var nodesOfCurrentColor = new HashSet<GraphNode>();
                     var neighbours = node.GetNeighbours();
                     foreach (var neighbour in neighbours)
+                    {
                         if (nodeSet.Contains(neighbour))
                             nodesOfCurrentColor.Add(neighbour);
+                    }
 
                     // if none - great, current K is suitable for coloring current node
                     if (nodesOfCurrentColor.Count == 0)
@@ -221,9 +219,9 @@ namespace CPLEX
                 {
                     maxColor = k;
                     // New color, so create a new set for nodes
-                    colorsSets.Add(k, new List<GraphNode>());
+                    colorsSets.Add(k, new HashSet<GraphNode>());
                 }
-                List<GraphNode> kNodeList;
+                HashSet<GraphNode> kNodeList;
                 colorsSets.TryGetValue(k, out kNodeList);
                 kNodeList.Add(node);
                 colorsSets.Remove(k);
@@ -232,80 +230,6 @@ namespace CPLEX
             }
 
             return colorsSets;
-        }
-
-        /**
-         * Implementation based on Tomita and Yamada (1978), Fujii and Tomita (1982), and Tomita et al. (1988)
-         * http://www.dcs.gla.ac.uk/~pat/jchoco/clique/indSetMachrahanish/papers/tomita2006.pdf
-         * Returns chromatic number for given nodes
-        */
-        private static Dictionary<int, int> FindChromaticNumber(List<GraphNode> nodes)
-        {
-            // It is better for us to have small color for nodes with a little number of neighbours
-            // In this case using |Q|+|R| > |Qmax| we will reject nodes with big number of neighbours
-            nodes = nodes.OrderByDescending(o => o.GetNeighbours().Count).ToList();
-            int maxColor = 0;
-            // contains sets with vertexes of the same color. Key - color number, value - set of nodes of this color
-            Dictionary<int, HashSet<GraphNode>> colorsSets = new Dictionary<int, HashSet<GraphNode>>();
-            Dictionary<int, int> colors = new Dictionary<int, int>();
-
-            foreach (GraphNode node in nodes)
-            {
-                int k = 1;
-
-                while (true)
-                {
-                    // Get all nodes of current K color
-                    HashSet<GraphNode> kColorNodes;
-                    colorsSets.TryGetValue(k, out kColorNodes);
-                    HashSet<GraphNode> nodesOfCurrentColor = kColorNodes != null ? kColorNodes : new HashSet<GraphNode>();
-                    HashSet<GraphNode> neigboursOfCurrentColor = new HashSet<GraphNode>();
-
-                    // And try to find neighbours with this color
-                    foreach (GraphNode neigbour in node.GetNeighbours())
-                    {
-                        if (nodesOfCurrentColor.Contains(neigbour))
-                        {
-                            neigboursOfCurrentColor.Add(neigbour);
-                        }
-                    }
-
-                    // if none - great, current K is suitable for coloring current node
-                    if (neigboursOfCurrentColor.Count == 0)
-                    {
-                        break;
-                    }
-                    // Otherwise  - continue cycle
-                    k++;
-                }
-
-                if (k > maxColor)
-                {
-                    maxColor = k;
-                    // New color, so create a new set for nodes
-                    colorsSets.Add(k, new HashSet<GraphNode>());
-                }
-                HashSet<GraphNode> colorSetNodes = new HashSet<GraphNode>();
-                colorsSets.TryGetValue(k, out colorSetNodes);
-                colorSetNodes.Add(node);
-                colorsSets.Remove(k);
-                colorsSets.Add(k, colorSetNodes);
-                colors.Add(node.GetIndex(), k);
-            }
-
-            return colors;
-        }
-
-        private int GetColorValue(GraphNode o, Dictionary<int, int> colors)
-        {
-            int colorValue;
-            colors.TryGetValue(o.GetIndex(), out colorValue);
-            return colorValue;
-        }
-
-        private void SortByColor(List<GraphNode> collection, Dictionary<int, int> colors)
-        {
-            collection = collection.OrderByDescending(o => GetColorValue(o, colors)).ToList();
         }
     }
 }
