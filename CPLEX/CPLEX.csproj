@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App.cs" />
+    <Compile Include="Extensions.cs" />
     <Compile Include="Heuristic.cs" />
     <Compile Include="LP.cs" />
     <Compile Include="NewGraph.cs" />
@@ -68,7 +69,9 @@
     <None Include="c-fat200-2 %28copy%29.clq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="C125.9.clq" />
+    <None Include="C125.9.clq">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Content Include="custom.txt" />

@@ -8,7 +8,7 @@ namespace CPLEX
 {
     public class CplexSolver
     {
-        private const double EPS = 1e-4;
+        private int upperBound;
         public int CallsCount { get; private set; }
         private readonly Cplex cplex;
         private readonly NewGraph graph;
@@ -27,7 +27,7 @@ namespace CPLEX
 
         private void Initialize()
         {
-            cplex.SetOut(null);
+            cplex.SetOut(Console.Out);
 
             // Variables
             InitializeVars();
@@ -96,19 +96,17 @@ namespace CPLEX
 
         public List<GraphNode> FindMaxClique()
         {
-            List<GraphNode> nodes = new List<GraphNode>(graph.GetNodes().Values);
-            int lb = 0;
-            FindCliqueInternal(lb);
+            FindCliqueInternal();
             return maxClique;
         }
 
-        private void FindCliqueInternal(int lb)
+        private void FindCliqueInternal()
         {
             CallsCount++;
             if (!cplex.Solve()) return;
             // this branch won't give us better result than existing one
-            var objValue = Math.Floor(cplex.GetObjValue());
-            if (lb > objValue || Math.Abs(lb - objValue) < EPS)
+            var objValue = cplex.GetObjValue();
+            if (upperBound > objValue || objValue.Almost(upperBound))
             {
                 return;
             }
@@ -119,18 +117,18 @@ namespace CPLEX
             for (var d = 0; d < varsValues.Length; d++)
             {
                 // if fractional var is found - doing branching basing on it
-                if (Math.Abs(varsValues[d] % 1) > EPS)
+                if (!varsValues[d].IsInteger())
                 {
                     firstFractalIndex = d;
                     break;
                 }
 
                 // until we found fractal value of some var - it is potentially a clique
-                if (Math.Abs(varsValues[d] - 1.0) < EPS)
+                if (varsValues[d].Almost(1))
                     if (maxClique.Count < possibleMaxClique.Count)
                     {
                         maxClique = possibleMaxClique;
-                        lb = maxClique.Count;
+                        upperBound = maxClique.Count;
                     }
                 var nodes = graph.GetNodes();
                 var node = nodes.ElementAt(d).Value;
@@ -139,7 +137,7 @@ namespace CPLEX
 
             // it is an integer solution
             // if possible max clique is bigger then previous one - we found new max clique
-            if (firstFractalIndex == -1)
+            if (firstFractalIndex == -1 && objValue.IsInteger())
             {
                 if (maxClique.Count < possibleMaxClique.Count)
                 {
@@ -147,16 +145,16 @@ namespace CPLEX
                     INumVar newVar;
                     vars.TryGetValue(firstFractalIndex + 1, out newVar);
                     IRange newBranchConstraint = cplex.AddGe(newVar, 1);
-                    FindCliqueInternal(lb);
+                    FindCliqueInternal();
                     cplex.Remove(newBranchConstraint);
 
                     vars.TryGetValue(firstFractalIndex + 1, out newVar);
                     newBranchConstraint = cplex.AddLe(newVar, 0);
-                    FindCliqueInternal(lb);
+                    FindCliqueInternal();
                     cplex.Remove(newBranchConstraint);
 
                     maxClique = possibleMaxClique;
-                    lb = maxClique.Count;
+                    upperBound = maxClique.Count;
                 }
             }
             else
@@ -165,13 +163,12 @@ namespace CPLEX
                 INumVar newVar;
                 vars.TryGetValue(firstFractalIndex + 1, out newVar);
                 var newBranchConstraint = cplex.AddGe(newVar, 1);
-                FindCliqueInternal(lb);
+                FindCliqueInternal();
                 cplex.Remove(newBranchConstraint);
 
                 vars.TryGetValue(firstFractalIndex + 1, out newVar);
-                newBranchConstraint = cplex.AddLe(newVar, 0);
-                FindCliqueInternal(lb);
-                cplex.Remove(newBranchConstraint);
+                cplex.AddLe(newVar, 0);
+                FindCliqueInternal();
             }
         }
 
