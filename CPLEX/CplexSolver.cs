@@ -122,6 +122,7 @@ namespace CPLEX
             // if possible max clique is bigger then previous one - we found new max clique
             if (firstFractalIndex == -1)
             {
+                possibleMaxClique.All(x => { Console.WriteLine(x.Index); return true; });
                 if (possibleMaxClique.Count <= upperBound) return;
                 maxClique = possibleMaxClique;
                 upperBound = maxClique.Count;
