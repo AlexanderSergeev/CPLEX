@@ -3,35 +3,20 @@ using System.Linq;
 
 namespace CPLEX
 {
-    public class GraphNode
+    public struct GraphNode
     {
-        private int index;
-        private List<GraphNode> neighbours;
+        public int Index { get; }
+        public List<GraphNode> Neighbours { get; }
 
         public GraphNode(int index)
         {
-            this.index = index;
-            neighbours = new List<GraphNode>();
-        }
-
-        public void AddNeighbour(GraphNode neighbour)
-        {
-            neighbours.Add(neighbour);
-        }
-
-        public int GetIndex()
-        {
-            return index;
-        }
-
-        public List<GraphNode> GetNeighbours()
-        {
-            return neighbours;
+            Index = index;
+            Neighbours = new List<GraphNode>();
         }
 
         public override string ToString()
         {
-            return $"{index}\tneigbours:{string.Join(",", neighbours.Select(n => n.index))}";
+            return $"{Index}\tneigbours:{string.Join(",", Neighbours.Select(n => n.Index))}";
         }
     }
 }

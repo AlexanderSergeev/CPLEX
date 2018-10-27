@@ -13,14 +13,14 @@ namespace CPLEX
         private readonly Cplex cplex;
         private readonly NewGraph graph;
         private List<GraphNode> maxClique;
-        private readonly Dictionary<int, INumVar> vars;
+        private readonly INumVar[] vars;
 
         public CplexSolver(NewGraph graph)
         {
             this.graph = graph;
             maxClique = new List<GraphNode>();
             cplex = new Cplex();
-            vars = new Dictionary<int, INumVar>();
+            vars = graph.Nodes.Select(node => cplex.NumVar(0, 1, $"{node}n")).ToArray();
 
             Initialize();
         }
@@ -28,9 +28,6 @@ namespace CPLEX
         private void Initialize()
         {
             cplex.SetOut(Console.Out);
-
-            // Variables
-            InitializeVars();
 
             // objective function -> max
             InitializeObjFunc();
@@ -44,15 +41,14 @@ namespace CPLEX
 
         private void AddIndependentSetsConstraints()
         {
-            var independentSets = GetIndependentSets(new List<GraphNode>(graph.GetNodes().Values));
+            var independentSets = GetIndependentSets(new List<GraphNode>(graph.Nodes));
             var sets = independentSets.Values.Where(x => x.Count > 1);
             foreach (var set in sets)
             {
                 var iloNumExpr = cplex.NumExpr();
                 foreach (var node in set)
                 {
-                    INumVar curVar;
-                    vars.TryGetValue(node.GetIndex(), out curVar);
+                    var curVar = vars[node.Index - 1];
                     iloNumExpr = cplex.Sum(iloNumExpr, curVar);
                 }
 
@@ -62,19 +58,16 @@ namespace CPLEX
 
         private void AddPrimitiveConstraints()
         {
-            foreach (var node in graph.GetNodes().Values)
-                for (var anotherNodeIndex = node.GetIndex() + 1;
-                    anotherNodeIndex <= graph.GetNodes().Count;
+            foreach (var node in graph.Nodes)
+                for (var anotherNodeIndex = node.Index + 1;
+                    anotherNodeIndex <= graph.Nodes.Count;
                     anotherNodeIndex++)
                 {
-                    GraphNode anotherNodeValue;
-                    graph.GetNodes().TryGetValue(anotherNodeIndex, out anotherNodeValue);
-                    if (!node.GetNeighbours().Contains(anotherNodeValue))
+                    var anotherNodeValue = graph.Nodes.First(n => n.Index == anotherNodeIndex);
+                    if (!node.Neighbours.Contains(anotherNodeValue))
                     {
-                        INumVar indexVar;
-                        INumVar anotherNodeIndexVar;
-                        vars.TryGetValue(node.GetIndex(), out indexVar);
-                        vars.TryGetValue(anotherNodeIndex, out anotherNodeIndexVar);
+                        var indexVar = vars[node.Index - 1];
+                        var anotherNodeIndexVar = vars[anotherNodeIndex - 1];
                         cplex.AddLe(cplex.Sum(indexVar, anotherNodeIndexVar), 1);
                     }
                 }
@@ -83,15 +76,9 @@ namespace CPLEX
         private void InitializeObjFunc()
         {
             var func = cplex.LinearNumExpr();
-            foreach (var x in vars.Values)
+            foreach (var x in vars)
                 func.AddTerm(1, x);
             cplex.AddMaximize(func);
-        }
-
-        private void InitializeVars()
-        {
-            foreach (var x in graph.GetNodes())
-                vars.Add(x.Value.GetIndex(), cplex.NumVar(0, 1, x.Value.GetIndex() + "n"));
         }
 
         public List<GraphNode> FindMaxClique()
@@ -104,87 +91,59 @@ namespace CPLEX
         {
             CallsCount++;
             if (!cplex.Solve()) return;
-            // this branch won't give us better result than existing one
             var objValue = cplex.GetObjValue();
+
+            // this branch won't give us better result than existing one
             if (upperBound > objValue || objValue.Almost(upperBound))
             {
                 return;
             }
-            var valuesArray = vars.Values.ToArray();
-            var varsValues = cplex.GetValues(valuesArray);
+            var numVars = vars.ToArray();
+            var values = cplex.GetValues(numVars);
             var firstFractalIndex = -1;
             var possibleMaxClique = new List<GraphNode>();
-            for (var d = 0; d < varsValues.Length; d++)
+            for (var i = 0; i < values.Length; i++)
             {
                 // if fractional var is found - doing branching basing on it
-                if (!varsValues[d].IsInteger())
+                if (!values[i].IsInteger())
                 {
-                    firstFractalIndex = d;
+                    firstFractalIndex = i;
                     break;
                 }
 
                 // until we found fractal value of some var - it is potentially a clique
-                if (varsValues[d].Almost(1))
-                    if (maxClique.Count < possibleMaxClique.Count)
-                    {
-                        maxClique = possibleMaxClique;
-                        upperBound = maxClique.Count;
-                    }
-                var nodes = graph.GetNodes();
-                GraphNode node;
-                nodes.TryGetValue(d, out node);
-                possibleMaxClique.Add(node);
+                if (values[i].Almost(1))
+                {
+                    possibleMaxClique.Add(graph.Nodes[i]);
+                }
             }
 
             // it is an integer solution
             // if possible max clique is bigger then previous one - we found new max clique
-            if (firstFractalIndex == -1 && objValue.IsInteger())
+            if (firstFractalIndex == -1)
             {
-                if (maxClique.Count < possibleMaxClique.Count)
-                {
-                    // doing branching
-                    INumVar newVar;
-                    vars.TryGetValue(firstFractalIndex + 1, out newVar);
-                    IRange newBranchConstraint = cplex.AddGe(newVar, 1);
-                    FindCliqueInternal();
-                    cplex.Remove(newBranchConstraint);
-
-                    vars.TryGetValue(firstFractalIndex + 1, out newVar);
-                    newBranchConstraint = cplex.AddLe(newVar, 0);
-                    FindCliqueInternal();
-                    cplex.Remove(newBranchConstraint);
-
-                    maxClique = possibleMaxClique;
-                    upperBound = maxClique.Count;
-                }
+                if (possibleMaxClique.Count <= upperBound) return;
+                maxClique = possibleMaxClique;
+                upperBound = maxClique.Count;
             }
             else
             {
                 // otherwise doing branching
-                INumVar newVar;
-                vars.TryGetValue(firstFractalIndex + 1, out newVar);
-                var newBranchConstraint = cplex.AddGe(newVar, 1);
+                var newVar = vars[firstFractalIndex];
+                var newBranchConstraint = cplex.AddLe(newVar, 0);
                 FindCliqueInternal();
                 cplex.Remove(newBranchConstraint);
 
-                vars.TryGetValue(firstFractalIndex + 1, out newVar);
-                cplex.AddLe(newVar, 0);
+                cplex.AddGe(newVar, 1);
                 FindCliqueInternal();
             }
         }
 
-        public List<GraphNode> GetMaxClique()
+        private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(IEnumerable<GraphNode> graphNodes)
         {
-            return maxClique;
-        }
-
-        private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(List<GraphNode> graphNodes)
-        {
-            var maxColor = 0;
             // contains sets with vertexes of the same color. Key - color number, value - set of nodes of this color
             var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
-            var colors = new Dictionary<int, int>();
-            var nodes = graphNodes.OrderByDescending(o => o.GetNeighbours().Count).ToList();
+            var nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count).ToList();
 
             foreach (var node in nodes)
             {
@@ -194,39 +153,18 @@ namespace CPLEX
                 {
                     // Get all nodes of current K color
                     HashSet<GraphNode> nodeSet;
-                    if (!colorsSets.TryGetValue(k, out nodeSet))
-                        nodeSet = new HashSet<GraphNode>();
+                    colorsSets.TryGetValue(k, out nodeSet);
 
                     // And try to find neighbours with this color
-                    var nodesOfCurrentColor = new HashSet<GraphNode>();
-                    var neighbours = node.GetNeighbours();
-                    foreach (var neighbour in neighbours)
-                    {
-                        if (nodeSet.Contains(neighbour))
-                            nodesOfCurrentColor.Add(neighbour);
-                    }
-
-                    // if none - great, current K is suitable for coloring current node
-                    if (nodesOfCurrentColor.Count == 0)
+                    if (!node.Neighbours.Any(x => nodeSet?.Contains(x) ?? false))
                         break;
                     // Otherwise  - continue cycle
                     k++;
                 }
-
-                if (k > maxColor)
-                {
-                    maxColor = k;
-                    // New color, so create a new set for nodes
-                    colorsSets.Add(k, new HashSet<GraphNode>());
-                }
-                HashSet<GraphNode> kNodeList;
-                colorsSets.TryGetValue(k, out kNodeList);
-                kNodeList.Add(node);
-                colorsSets.Remove(k);
-                colorsSets.Add(k, kNodeList);
-                colors.Add(node.GetIndex(), k);
+                if (!colorsSets.ContainsKey(k))
+                    colorsSets[k] = new HashSet<GraphNode>();
+                colorsSets[k].Add(node);
             }
-
             return colorsSets;
         }
     }
