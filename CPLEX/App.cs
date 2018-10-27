@@ -11,7 +11,8 @@ public class App
         var upperBound = 0;
         var algorithm = new CplexSolver(graph); 
         var result = algorithm.FindMaxClique(upperBound);
-        result.All(x => { Console.WriteLine(x.ToString()); return true; });
+        result.All(x => { Console.WriteLine(x); return true; });
+        Console.WriteLine($"Calls: {algorithm.CallsCount}");
         Console.ReadKey(false);
     }
 }
