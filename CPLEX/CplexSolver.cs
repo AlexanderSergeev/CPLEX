@@ -34,11 +34,11 @@ namespace CPLEX
             // objective function -> max
             InitializeObjFunc();
 
-            // add obvious constraints on nodes which are not connected
+            // add constraints on nodes which are not connected
             AddPrimitiveConstraints();
 
-            // add constraints based on independent sets
-            //AddIndependentSetsConstraints();
+            // add constraints based on independent sets (greedy graph coloring)
+            AddIndependentSetsConstraints();
         }
 
         private void AddIndependentSetsConstraints()
@@ -117,13 +117,13 @@ namespace CPLEX
             var possibleMaxClique = new List<GraphNode>();
             for (var i = 0; i < values.Length; i++)
             {
-                // if fractional var is found - doing branching basing on it
+                // if fractional var is found - doing branching based on it
                 if (!values[i].IsInteger())
                 {
                     firstFractalIndex = i;
                     break;
                 }
-                // until we found fractal value of some var - it is potentially a clique
+                // until we found fractional value of some var - it is potentially a clique
                 if (values[i].Almost(1))
                 {
                     possibleMaxClique.Add(graph.Nodes[i]);
@@ -131,7 +131,7 @@ namespace CPLEX
             }
 
             // it is an integer solution
-            // if possible max clique is bigger then previous one - we found new max clique
+            // if possible max clique is bigger than the previous one - we found a new max clique
             if (firstFractalIndex == -1)
             {
                 writer.WriteLine($"Current {possibleMaxClique.Count} clique: {string.Join(", ", possibleMaxClique.Select(x => x.Index))}");
@@ -158,7 +158,7 @@ namespace CPLEX
 
         private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(IEnumerable<GraphNode> graphNodes)
         {
-            // contains sets with vertexes of the same color. Key - color number, value - set of nodes of this color
+            // contains sets with vertices of the same color. Key - color number, value - set of nodes of this color
             var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
             var nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count);
 
