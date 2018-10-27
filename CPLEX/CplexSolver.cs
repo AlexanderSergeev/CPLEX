@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using ILOG.Concert;
 using ILOG.CPLEX;
@@ -36,7 +37,7 @@ namespace CPLEX
             AddPrimitiveConstraints();
 
             // add constraints based on independent sets
-            AddIndependentSetsConstraints();
+            //AddIndependentSetsConstraints();
         }
 
         private void AddIndependentSetsConstraints()
@@ -63,12 +64,12 @@ namespace CPLEX
                     anotherNodeIndex <= graph.Nodes.Count;
                     anotherNodeIndex++)
                 {
-                    var anotherNodeValue = graph[anotherNodeIndex];
-                    if (!node.Neighbours.Contains(anotherNodeValue))
+                    var anotherNode = graph[anotherNodeIndex];
+                    if (!node.Neighbours.Contains(anotherNode))
                     {
-                        var indexVar = vars[node.Index - 1];
-                        var anotherNodeIndexVar = vars[anotherNodeIndex - 1];
-                        cplex.AddLe(cplex.Sum(indexVar, anotherNodeIndexVar), 1);
+                        var numVar = vars[node.Index - 1];
+                        var anotherNumVar = vars[anotherNodeIndex - 1];
+                        cplex.AddLe(cplex.Sum(numVar, anotherNumVar), 1);
                     }
                 }
         }
@@ -94,9 +95,9 @@ namespace CPLEX
             var objValue = cplex.GetObjValue();
 
             // this branch won't give us better result than existing one
-            if (upperBound > objValue || objValue.Almost(upperBound))
+            if (objValue < upperBound || objValue.Almost(upperBound))
             {
-                return;
+                RemoveAndGoNext();
             }
             var values = cplex.GetValues(vars);
             var firstFractalIndex = -1;
@@ -109,11 +110,13 @@ namespace CPLEX
                     firstFractalIndex = i;
                     break;
                 }
-
                 // until we found fractal value of some var - it is potentially a clique
                 if (values[i].Almost(1))
                 {
                     possibleMaxClique.Add(graph.Nodes[i]);
+                    using (var writer = new StreamWriter("log.txt", true))
+                        writer.WriteLine(
+                            $"Current clique: {string.Join(", ", possibleMaxClique.Select(x => x.Index))}");
                 }
             }
 
@@ -121,21 +124,24 @@ namespace CPLEX
             // if possible max clique is bigger then previous one - we found new max clique
             if (firstFractalIndex == -1)
             {
-                Console.WriteLine($"Current clique: {string.Join(", ", possibleMaxClique.Select(x=>x.Index))}");
-                if (possibleMaxClique.Count <= upperBound) return;
-                maxClique = possibleMaxClique;
-                upperBound = maxClique.Count;
+                if (possibleMaxClique.Count > upperBound)
+                {
+                    maxClique = possibleMaxClique;
+                    upperBound = maxClique.Count;
+                }
+                RemoveAndGoNext();
             }
             else
             {
                 // otherwise doing branching
                 var newVar = vars[firstFractalIndex];
-                var newBranchConstraint = cplex.AddLe(newVar, 0);
+                var newBranchConstraint = cplex.AddGe(newVar, 1);
                 FindCliqueInternal();
                 cplex.Remove(newBranchConstraint);
 
-                cplex.AddGe(newVar, 1);
+                newBranchConstraint=cplex.AddLe(newVar, 0);
                 FindCliqueInternal();
+                cplex.Remove(newBranchConstraint);
             }
         }
 
@@ -166,6 +172,14 @@ namespace CPLEX
                 colorsSets[k].Add(node);
             }
             return colorsSets;
+        }
+
+        private void RemoveAndGoNext()
+        {
+            var firstOne = vars.FirstOrDefault(x => cplex.GetValue(x).Almost(1));
+            if (firstOne == null) return;
+            cplex.AddLe(firstOne, 0);
+            FindCliqueInternal();
         }
     }
 }
