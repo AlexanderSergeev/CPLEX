@@ -8,7 +8,7 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var graph = GraphParser.ParseNewGraph("c-fat200-2.clq");
+        var graph = GraphParser.ParseNewGraph("brock200_2.clq");
         var algorithm = new CplexSolver(graph);
         var timer = Stopwatch.StartNew();
         var result = algorithm.FindMaxClique();
