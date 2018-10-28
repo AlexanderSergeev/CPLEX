@@ -12,7 +12,7 @@ public class App
         var algorithm = new CplexSolver(graph);
         var timer = Stopwatch.StartNew();
         var result = algorithm.FindMaxClique();
-        result.All(x => { Console.Write(x); return true; });
+        Console.WriteLine(string.Join(", ", result.Select(node => node.Index)));
         Console.WriteLine($"Result: {result.Count}. Calls: {algorithm.CallsCount}. Done in {timer.Elapsed}");
         Console.ReadKey(false);
     }

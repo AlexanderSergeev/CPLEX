@@ -109,30 +109,10 @@ namespace CPLEX
             var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
             if (branchingVariable == null)
             {
-                // if fractional var is found - doing branching basing on it
-                if (!values[i].IsInteger())
-                {
-                    firstFractalIndex = i;
-                    break;
-                }
-                // until we found fractal value of some var - it is potentially a clique
-                if (values[i].Almost(1))
-                {
-                    possibleMaxClique.Add(graph.Nodes[i]);
-                }
-            }
-
-            // it is an integer solution
-            // if possible max clique is bigger then previous one - we found new max clique
-            if (firstFractalIndex == -1)
-            {
-                writer.WriteLine($"Current {possibleMaxClique.Count} clique: {string.Join(", ", possibleMaxClique.Select(x => x.Index))}");
-                if (possibleMaxClique.Count > upperBound)
-                {
-                    maxClique = possibleMaxClique;
-                    upperBound = maxClique.Count;
-                }
-                RemoveAndGoNext();
+                var values = cplex.GetValues(numVars);
+                maxClique = graph.Nodes.Where((_, i) => values[i].Almost(1)).ToList();
+                upperBound = maxClique.Count;
+                return;
             }
             writer.WriteLine($"branching for {branchingVariable.Name}...");
             var constraint = cplex.AddGe(branchingVariable, 1);
