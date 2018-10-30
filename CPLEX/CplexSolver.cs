@@ -6,7 +6,6 @@ C125.9.clq      00:10:07.9879697    34
 */
 
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using ILOG.Concert;
 using ILOG.CPLEX;
@@ -18,7 +17,6 @@ namespace CPLEX
         private readonly Cplex cplex;
         private readonly NewGraph graph;
         private readonly INumVar[] numVars;
-        private readonly StreamWriter writer = new StreamWriter("log.txt");
         private List<GraphNode> maxClique;
         private int upperBound;
 
@@ -94,7 +92,6 @@ namespace CPLEX
         {
             FindCliqueInternal();
             cplex.End();
-            writer.Dispose();
             return maxClique;
         }
 
@@ -114,7 +111,6 @@ namespace CPLEX
                 upperBound = maxClique.Count;
                 return;
             }
-            writer.WriteLine($"branching for {branchingVariable.Name}...");
             var constraint = cplex.AddGe(branchingVariable, 1);
             FindCliqueInternal();
             cplex.Remove(constraint);
