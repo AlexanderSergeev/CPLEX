@@ -56,6 +56,21 @@ namespace CPLEX
             }
         }
 
+        private void AddIndependentSetsConstraints(List<GraphNode> set)
+        {
+            if (set.Count > 1)
+            {
+                var numExpr = cplex.NumExpr();
+                foreach (var node in set)
+                {
+                    var curVar = numVars[node.Index - 1];
+                    numExpr = cplex.Sum(numExpr, curVar);
+                }
+
+                cplex.AddLe(numExpr, 1);
+            }
+        }
+
         /*private void AddPrimitiveConstraints()
         {
             foreach (var node in graph.Nodes)
@@ -163,10 +178,39 @@ namespace CPLEX
                     FindCliqueInternal();
                     cplex.Remove(constraint);
                 }
-                // TODO: SP
+                // SP
                 else
                 {
+                    var weights = numVars.Select(var => cplex.GetValue(var)).ToArray();
+                    var graphNodes = new List<GraphNode>(graph.Nodes.OrderBy(node => weights[graph.Nodes.IndexOf(node)]));
+                    var maxWeightedSet = new List<GraphNode>();
+                    var maxWeight = 0.0;
 
+                    for (int i = 0; i < graphNodes.Count; i++)
+                    {
+                        var set = new List<GraphNode>();
+                        var removedVertices = new List<GraphNode>();
+                        var setWeight = 0.0;
+                        for (int j = i; j < graphNodes.Count; j++)
+                        {
+                            var node = graphNodes[j];
+                            if (!removedVertices.Contains(node))
+                            {
+                                set.Add(node);
+                                removedVertices.Add(node);
+                                removedVertices.AddRange(node.Neighbours);
+                                setWeight = setWeight + cplex.GetValue(numVars[j]);
+                            }
+                        }
+                        if (maxWeight<setWeight)
+                        {
+                            maxWeightedSet = set;
+                            maxWeight = setWeight;
+                        }
+                    }
+                    AddIndependentSetsConstraints(maxWeightedSet);
+                    previousObjValue = objValue;
+                    FindCliqueInternal();
                 }
             }
         }
@@ -208,6 +252,7 @@ namespace CPLEX
                 colorsSets[k].Add(node);
             }
            return colorsSets;
+            return colorsSets;
         }
     }
 }
