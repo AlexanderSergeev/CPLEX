@@ -62,20 +62,18 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="c-fat200-2.clq">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="c-fat500-1.clq">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="C125.9.clq">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="c-fat200-1.clq">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <Content Include="brock200_3.clq.txt" />
+    <Content Include="brock200_4.clq.txt" />
+    <Content Include="c-fat200-5.clq.txt" />
+    <Content Include="c-fat500-1.clq.txt" />
+    <Content Include="c-fat500-2.clq.txt" />
+    <Content Include="c-fat500-5.clq.txt" />
+    <Content Include="C125.9.clq.txt" />
+    <Content Include="hamming8-4.clq.txt" />
+    <Content Include="johnson16-2-4.clq.txt" />
+    <Content Include="keller4.clq.txt" />
     <Content Include="custom.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

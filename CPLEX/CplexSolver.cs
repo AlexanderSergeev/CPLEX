@@ -1,11 +1,4 @@
-﻿/*
-    граф             время       решение
-c-fat200-1      00:00:07.1169034    12
-c-fat200-2      00:00:00.1352045    24
-C125.9.clq      00:10:07.9879697    34
-*/
-
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using ILOG.Concert;
 using ILOG.CPLEX;
@@ -40,15 +33,15 @@ namespace CPLEX
             InitializeObjFunc();
 
             // add constraints on nodes which are not connected
-            AddPrimitiveConstraints();
+            //AddPrimitiveConstraints();
 
-            // add constraints based on independent sets (greedy graph coloring)
-            AddIndependentSetsConstraints();
+            // add constraints based on max independent sets (greedy graph coloring)
+            AddMaxIndependentSetsConstraints();
         }
 
-        private void AddIndependentSetsConstraints()
+        private void AddMaxIndependentSetsConstraints()
         {
-            var independentSets = GetIndependentSets(new List<GraphNode>(graph.Nodes));
+            var independentSets = GetMaxIndependentSets(new List<GraphNode>(graph.Nodes));
             var sets = independentSets.Values.Where(x => x.Count > 1);
             foreach (var set in sets)
             {
@@ -63,7 +56,7 @@ namespace CPLEX
             }
         }
 
-        private void AddPrimitiveConstraints()
+        /*private void AddPrimitiveConstraints()
         {
             foreach (var node in graph.Nodes)
                 for (var anotherNodeIndex = node.Index + 1;
@@ -78,7 +71,7 @@ namespace CPLEX
                         cplex.AddLe(cplex.Sum(numVar, anotherNumVar), 1);
                     }
                 }
-        }
+        }*/
 
         private void InitializeObjFunc()
         {
@@ -104,13 +97,25 @@ namespace CPLEX
             if (objValue < upperBound || objValue.Almost(upperBound))
                 return;
             var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
+            // решение целое
             if (branchingVariable == null)
             {
                 var values = cplex.GetValues(numVars);
-                maxClique = graph.Nodes.Where((_, i) => values[i].Almost(1)).ToList();
-                upperBound = maxClique.Count;
-                return;
+                if (IsClique(values))
+                {
+                    maxClique = graph.Nodes.Where((_, i) => values[i].Almost(1)).ToList();
+                    upperBound = maxClique.Count;
+                    return;
+                }
+                else
+                {
+                    // TODO: добавить ограничение
+                    // var constraint = cplex.AddGe(branchingVariable, 1);
+                    return;
+                }
             }
+            // решение дробное
+            // TODO: SP + ветвление
             var constraint = cplex.AddGe(branchingVariable, 1);
             FindCliqueInternal();
             cplex.Remove(constraint);
@@ -120,8 +125,23 @@ namespace CPLEX
             cplex.Remove(constraint);
         }
 
+        private bool IsClique(double[] values)
+        {
+            var possibleClique = graph.Nodes.Where((_, i) => values[i].Almost(1)).ToList();
+            foreach (var node in possibleClique)
+            {
+                foreach (var neighbour in possibleClique)
+                {
+                    if (node.Index!=neighbour.Index &&!node.Neighbours.Contains(neighbour))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
-        private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(IEnumerable<GraphNode> graphNodes)
+        private static Dictionary<int, HashSet<GraphNode>> GetMaxIndependentSets(IEnumerable<GraphNode> graphNodes)
         {
             // contains sets with vertices of the same color. Key - color number, value - set of nodes of this color
             var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
@@ -147,7 +167,23 @@ namespace CPLEX
                     colorsSets[k] = new HashSet<GraphNode>();
                 colorsSets[k].Add(node);
             }
-            return colorsSets;
+            // Get max length sets
+            var maxLength = 0;
+            var maxColorsSets = new Dictionary<int, HashSet<GraphNode>>();
+            foreach (var colorSet in colorsSets)
+            {
+                if (colorSet.Value.Count > maxLength)
+                {
+                    maxColorsSets = new Dictionary<int, HashSet<GraphNode>>();
+                    maxColorsSets.Add(colorSet.Key, colorSet.Value);
+                    maxLength = colorSet.Value.Count;
+                }
+                else if (colorSet.Value.Count == maxLength)
+                {
+                    maxColorsSets.Add(colorSet.Key, colorSet.Value);
+                }
+            }
+            return maxColorsSets;
         }
     }
 }

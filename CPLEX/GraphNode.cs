@@ -16,7 +16,7 @@ namespace CPLEX
 
         public override string ToString()
         {
-            return $",{Index}";
+            return $"{Index}";
         }
     }
 }
