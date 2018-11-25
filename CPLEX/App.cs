@@ -7,7 +7,7 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var fileName = "custom.txt";
+        var fileName = "C125.9.clq.txt";
         Console.WriteLine("executionTime, cliqueCount, clique");
         var graph = GraphParser.ParseNewGraph(fileName);
         var algorithm = new CplexSolver(graph);
