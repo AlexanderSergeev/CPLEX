@@ -7,11 +7,11 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var fileName = "C125.9.clq.txt";
-        Console.WriteLine("executionTime, cliqueCount, clique");
+        var timer = Stopwatch.StartNew();
+        var fileName = "johnson16-2-4.clq.txt";
+        Console.WriteLine(fileName);
         var graph = GraphParser.ParseNewGraph(fileName);
         var algorithm = new CplexSolver(graph);
-        var timer = Stopwatch.StartNew();
         var result = algorithm.FindMaxClique();
         Console.WriteLine(timer.Elapsed);
         Console.WriteLine(result.Count);

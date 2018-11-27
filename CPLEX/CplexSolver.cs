@@ -2,6 +2,7 @@
 using System.Linq;
 using ILOG.Concert;
 using ILOG.CPLEX;
+using System;
 
 namespace CPLEX
 {
@@ -33,11 +34,8 @@ namespace CPLEX
             // objective function -> max
             InitializeObjFunc();
 
-            // add constraints on nodes which are not connected
-            //AddPrimitiveConstraints();
-
-            // add constraints based on independent sets (greedy graph coloring)
-            AddIndependentSetsConstraints(GetIndependentSets(new List<GraphNode>(graph.Nodes), false));
+            // add constraints based on max independent sets
+            AddIndependentSetsConstraints(GetMaxIndependentSets(new List<GraphNode>(graph.Nodes)));
         }
 
         private void AddIndependentSetsConstraints(Dictionary<int, HashSet<GraphNode>> independentSets)
@@ -58,35 +56,30 @@ namespace CPLEX
 
         private void AddIndependentSetsConstraints(List<GraphNode> set)
         {
-            if (set.Count > 1)
+            var numExpr = cplex.NumExpr();
+            foreach (var node in set)
+            {
+                var curVar = numVars[node.Index - 1];
+                numExpr = cplex.Sum(numExpr, curVar);
+            }
+
+            cplex.AddLe(numExpr, 1);
+        }
+
+        private void AddEdgesConstraints(List<Tuple<GraphNode, GraphNode>> edges)
+        {
+            foreach (var edge in edges)
             {
                 var numExpr = cplex.NumExpr();
-                foreach (var node in set)
-                {
-                    var curVar = numVars[node.Index - 1];
-                    numExpr = cplex.Sum(numExpr, curVar);
-                }
+                var curVar = numVars[edge.Item1.Index - 1];
+                numExpr = cplex.Sum(numExpr, curVar);
+                curVar = numVars[edge.Item2.Index - 1];
+                numExpr = cplex.Sum(numExpr, curVar);
 
                 cplex.AddLe(numExpr, 1);
             }
         }
-
-        /*private void AddPrimitiveConstraints()
-        {
-            foreach (var node in graph.Nodes)
-                for (var anotherNodeIndex = node.Index + 1;
-                    anotherNodeIndex <= graph.Nodes.Count;
-                    anotherNodeIndex++)
-                {
-                    var anotherNode = graph[anotherNodeIndex];
-                    if (!node.Neighbours.Contains(anotherNode))
-                    {
-                        var numVar = numVars[node.Index - 1];
-                        var anotherNumVar = numVars[anotherNodeIndex - 1];
-                        cplex.AddLe(cplex.Sum(numVar, anotherNumVar), 1);
-                    }
-                }
-        }*/
+        
 
         private void InitializeObjFunc()
         {
@@ -120,6 +113,18 @@ namespace CPLEX
             bestResult = clique.Count;
         }
 
+        private bool IsClique(List<GraphNode> possibleClique)
+        {
+            foreach (var node in possibleClique)
+            {
+                if (!IsNodeConnectedToAllNeighbours(node, possibleClique))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private bool IsNodeConnectedToAllNeighbours(GraphNode node, List<GraphNode> neighbours)
         {
             foreach (var neighbour in neighbours)
@@ -146,16 +151,16 @@ namespace CPLEX
             {
                 var values = cplex.GetValues(numVars);
                 var possibleClique = graph.Nodes.Where((_, i) => values[i].Almost(1)).ToList();
-                var independentSets = GetIndependentSets(possibleClique, true);
                 // найденное решение - клика
-                if (possibleClique.Count == independentSets.Count)
+                if (IsClique(possibleClique))
                 {
                     maxClique = possibleClique;
                     bestResult = maxClique.Count;
                     return;
                 }
                 // найденное решение - не клика
-                AddIndependentSetsConstraints(independentSets);
+                var disconnectedEdges = GetCliqueDisconnectedEdges(possibleClique);
+                AddEdgesConstraints(disconnectedEdges);
                 previousObjValue = objValue;
                 FindCliqueInternal();
             }
@@ -179,32 +184,7 @@ namespace CPLEX
                 else
                 {
                     var weights = numVars.Select(var => cplex.GetValue(var)).ToArray();
-                    var graphNodes = new List<GraphNode>(graph.Nodes.OrderBy(node => weights[graph.Nodes.IndexOf(node)]));
-                    var maxWeightedSet = new List<GraphNode>();
-                    var maxWeight = 0.0;
-
-                    for (int i = 0; i < graphNodes.Count; i++)
-                    {
-                        var set = new List<GraphNode>();
-                        var removedVertices = new List<GraphNode>();
-                        var setWeight = 0.0;
-                        for (int j = i; j < graphNodes.Count; j++)
-                        {
-                            var node = graphNodes[j];
-                            if (!removedVertices.Contains(node))
-                            {
-                                set.Add(node);
-                                removedVertices.Add(node);
-                                removedVertices.AddRange(node.Neighbours);
-                                setWeight = setWeight + cplex.GetValue(numVars[j]);
-                            }
-                        }
-                        if (maxWeight<setWeight)
-                        {
-                            maxWeightedSet = set;
-                            maxWeight = setWeight;
-                        }
-                    }
+                    var maxWeightedSet = GetMaxWeightIndependentSet(graph.Nodes, weights);
                     AddIndependentSetsConstraints(maxWeightedSet);
                     previousObjValue = objValue;
                     FindCliqueInternal();
@@ -212,21 +192,11 @@ namespace CPLEX
             }
         }
 
-        private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(IEnumerable<GraphNode> graphNodes, bool isClique)
+        /*private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(IEnumerable<GraphNode> graphNodes)
         {
             // contains sets with vertices of the same color. Key - color number, value - set of nodes of this color
             var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
-            IEnumerable<GraphNode> nodes;
-            if (!isClique)
-            {
-               nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count);
-            }
-            else
-            // для клики считаем соседей только между узлами клики
-            {
-                nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count(n=>graphNodes.Contains(n)));
-            }
-
+            var nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count);
 
             foreach (var node in nodes)
             {
@@ -249,6 +219,80 @@ namespace CPLEX
                 colorsSets[k].Add(node);
             }
             return colorsSets;
+        }*/
+
+        private static Dictionary<int, HashSet<GraphNode>> GetMaxIndependentSets(List<GraphNode> graphNodes)
+        {
+            var sets = new Dictionary<int, HashSet<GraphNode>>();
+            var markedVertices = new List<GraphNode>();
+            var key = 1;
+
+            while (markedVertices.Count != graphNodes.Count)
+            {
+                var nodes = new List<GraphNode>(graphNodes);
+                var set = new HashSet<GraphNode>();
+                nodes.RemoveAll(x => markedVertices.Contains(x));
+
+                while (nodes.Count != 0)
+                {
+                    var sorted = nodes.OrderBy(o => o.Neighbours.Count(x => nodes.Contains(x)));
+                    var v = sorted.FirstOrDefault();
+                    set.Add(v);
+                    nodes.RemoveAll(x => x.Index == v.Index || v.Neighbours.Contains(x));
+                }
+                sets.Add(key, set);
+                key++;
+                markedVertices.AddRange(set);
+            }
+            return sets;
+        }
+
+        private static List<GraphNode> GetMaxWeightIndependentSet(List<GraphNode> graphNodes, double[] weights)
+        {
+            var maxWeightSet = new List<GraphNode>();
+            var maxWeight = 0.0;
+            var markedVertices = new List<GraphNode>();
+
+            while (markedVertices.Count != graphNodes.Count)
+            {
+                var nodes = new List<GraphNode>(graphNodes);
+                var set = new List<GraphNode>();
+                var setWeight = 0.0;
+                nodes.RemoveAll(x => markedVertices.Contains(x));
+
+                while (nodes.Count != 0)
+                {
+                    var sorted = nodes.OrderByDescending(node => weights[graphNodes.IndexOf(node)]);
+                    var v = sorted.FirstOrDefault();
+                    set.Add(v);
+                    setWeight = setWeight + weights[graphNodes.IndexOf(v)];
+                    nodes.RemoveAll(x => x.Index == v.Index || v.Neighbours.Contains(x));
+                }
+                if (setWeight > maxWeight || (setWeight.Almost(maxWeight) && set.Count>maxWeightSet.Count))
+                {
+                    maxWeight = setWeight;
+                    maxWeightSet = set;
+                }
+                markedVertices.AddRange(set);
+            }
+            return maxWeightSet;
+        }
+
+        private static List<Tuple<GraphNode, GraphNode>> GetCliqueDisconnectedEdges(List<GraphNode> clique)
+        {
+            var disconnectedEdges = new List<Tuple<GraphNode, GraphNode>>();
+
+            for (int i=0;i<clique.Count;i++)
+            {
+                for (int j=i+1;j<clique.Count;j++)
+                {
+                    if (!clique[i].Neighbours.Contains(clique[j]))
+                    {
+                        disconnectedEdges.Add(new Tuple<GraphNode, GraphNode>(clique[i], clique[j]));
+                    }
+                }
+            }
+            return disconnectedEdges;
         }
     }
 }
