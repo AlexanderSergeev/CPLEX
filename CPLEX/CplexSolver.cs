@@ -11,7 +11,7 @@ namespace CPLEX
         private readonly NewGraph graph;
         private readonly INumVar[] numVars;
         private List<GraphNode> maxClique;
-        private int upperBound;
+        private int bestResult;
         private double previousObjValue;
 
         public CplexSolver(NewGraph graph)
@@ -117,7 +117,7 @@ namespace CPLEX
                 }
             }
             maxClique = clique;
-            upperBound = clique.Count;
+            bestResult = clique.Count;
         }
 
         private bool IsNodeConnectedToAllNeighbours(GraphNode node, List<GraphNode> neighbours)
@@ -138,7 +138,7 @@ namespace CPLEX
             if (!cplex.Solve()) return;
             var objValue = cplex.GetObjValue();
             // this branch won't give us better result than existing one
-            if (objValue < upperBound || objValue.Almost(upperBound))
+            if (objValue < bestResult || objValue.Almost(bestResult))
                 return;
             var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
             // решение целое
@@ -151,16 +151,13 @@ namespace CPLEX
                 if (possibleClique.Count == independentSets.Count)
                 {
                     maxClique = possibleClique;
-                    upperBound = maxClique.Count;
+                    bestResult = maxClique.Count;
                     return;
                 }
                 // найденное решение - не клика
-                else
-                {
-                    AddIndependentSetsConstraints(independentSets);
-                    previousObjValue = objValue;
-                    FindCliqueInternal();
-                }
+                AddIndependentSetsConstraints(independentSets);
+                previousObjValue = objValue;
+                FindCliqueInternal();
             }
             // решение дробное
             else
@@ -219,7 +216,7 @@ namespace CPLEX
         {
             // contains sets with vertices of the same color. Key - color number, value - set of nodes of this color
             var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
-            IEnumerable<GraphNode> nodes = null;
+            IEnumerable<GraphNode> nodes;
             if (!isClique)
             {
                nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count);
@@ -251,7 +248,6 @@ namespace CPLEX
                     colorsSets[k] = new HashSet<GraphNode>();
                 colorsSets[k].Add(node);
             }
-           return colorsSets;
             return colorsSets;
         }
     }
