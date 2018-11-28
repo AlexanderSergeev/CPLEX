@@ -46,7 +46,7 @@ namespace CPLEX
                 var numExpr = cplex.NumExpr();
                 foreach (var node in set)
                 {
-                    var curVar = numVars[node.Index - 1];
+                    var curVar = numVars[graph.Nodes.IndexOf(node)];
                     numExpr = cplex.Sum(numExpr, curVar);
                 }
 
@@ -54,26 +54,26 @@ namespace CPLEX
             }
         }
 
-        private void AddIndependentSetsConstraints(List<GraphNode> set)
+        private void AddIndependentSetsConstraints(IEnumerable<GraphNode> set)
         {
             var numExpr = cplex.NumExpr();
             foreach (var node in set)
             {
-                var curVar = numVars[node.Index - 1];
+                var curVar = numVars[graph.Nodes.IndexOf(node)];
                 numExpr = cplex.Sum(numExpr, curVar);
             }
 
             cplex.AddLe(numExpr, 1);
         }
 
-        private void AddEdgesConstraints(List<Tuple<GraphNode, GraphNode>> edges)
+        private void AddEdgesConstraints(IEnumerable<Tuple<GraphNode, GraphNode>> edges)
         {
             foreach (var edge in edges)
             {
                 var numExpr = cplex.NumExpr();
-                var curVar = numVars[edge.Item1.Index - 1];
+                var curVar = numVars[graph.Nodes.IndexOf(edge.Item1)];
                 numExpr = cplex.Sum(numExpr, curVar);
-                curVar = numVars[edge.Item2.Index - 1];
+                curVar = numVars[graph.Nodes.IndexOf(edge.Item2)];
                 numExpr = cplex.Sum(numExpr, curVar);
 
                 cplex.AddLe(numExpr, 1);
@@ -99,21 +99,25 @@ namespace CPLEX
 
         private void FindMaxCliqueWithHeuristics()
         {
-            var graphNodes = new List<GraphNode>(graph.Nodes.OrderBy(o => o.Neighbours.Count));
-            var clique = new List<GraphNode>(graphNodes);
+            var graphNodes = new List<GraphNode>(graph.Nodes.OrderByDescending(o => o.Neighbours.Count));
+            var clique = new List<GraphNode>
+            {
+                graphNodes[0]
+            };
+            graphNodes.Remove(graphNodes[0]);
 
             foreach (var node in graphNodes)
             {
-                if (!IsNodeConnectedToAllNeighbours(node, clique))
+                if (IsNodeConnectedToAllNeighbours(node, clique))
                 {
-                    clique.Remove(node);
+                    clique.Add(node);
                 }
             }
             maxClique = clique;
             bestResult = clique.Count;
         }
 
-        private bool IsClique(List<GraphNode> possibleClique)
+        private static bool IsClique(List<GraphNode> possibleClique)
         {
             foreach (var node in possibleClique)
             {
@@ -125,7 +129,7 @@ namespace CPLEX
             return true;
         }
 
-        private bool IsNodeConnectedToAllNeighbours(GraphNode node, List<GraphNode> neighbours)
+        private static bool IsNodeConnectedToAllNeighbours(GraphNode node, IEnumerable<GraphNode> neighbours)
         {
             foreach (var neighbour in neighbours)
             {
@@ -192,35 +196,6 @@ namespace CPLEX
             }
         }
 
-        /*private static Dictionary<int, HashSet<GraphNode>> GetIndependentSets(IEnumerable<GraphNode> graphNodes)
-        {
-            // contains sets with vertices of the same color. Key - color number, value - set of nodes of this color
-            var colorsSets = new Dictionary<int, HashSet<GraphNode>>();
-            var nodes = graphNodes.OrderByDescending(o => o.Neighbours.Count);
-
-            foreach (var node in nodes)
-            {
-                var k = 1;
-
-                while (true)
-                {
-                    // Get all nodes of current K color
-                    HashSet<GraphNode> nodeSet;
-                    colorsSets.TryGetValue(k, out nodeSet);
-
-                    // And try to find neighbours with this color
-                    if (!(nodeSet?.Intersect(node.Neighbours).Any() ?? false))
-                        break;
-                    // Otherwise  - continue cycle
-                    k++;
-                }
-                if (!colorsSets.ContainsKey(k))
-                    colorsSets[k] = new HashSet<GraphNode>();
-                colorsSets[k].Add(node);
-            }
-            return colorsSets;
-        }*/
-
         private static Dictionary<int, HashSet<GraphNode>> GetMaxIndependentSets(List<GraphNode> graphNodes)
         {
             var sets = new Dictionary<int, HashSet<GraphNode>>();
@@ -249,6 +224,34 @@ namespace CPLEX
 
         private static List<GraphNode> GetMaxWeightIndependentSet(List<GraphNode> graphNodes, double[] weights)
         {
+            var maxWeightedSet = new List<GraphNode>();
+            var maxWeight = 0.0;
+            var nodes = new List<GraphNode>(graphNodes.OrderByDescending(node => weights[graphNodes.IndexOf(node)]));
+
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                var set = new List<GraphNode>();
+                var removedVertices = new List<GraphNode>();
+                var setWeight = 0.0;
+
+                for (var j = i; j < nodes.Count; j++)
+                {
+                    var node = nodes[j];
+                    if (!removedVertices.Contains(node))
+                    {
+                        set.Add(node);
+                        removedVertices.Add(node);
+                        removedVertices.AddRange(node.Neighbours);
+                        setWeight = setWeight + weights[graphNodes.IndexOf(node)];
+                    }
+                }
+                if (setWeight > maxWeight || (setWeight.Almost(maxWeight) && set.Count > maxWeightedSet.Count))
+                {
+                    maxWeightedSet = set;
+                    maxWeight = setWeight;
+                }
+            }
+            /*
             var maxWeightSet = new List<GraphNode>();
             var maxWeight = 0.0;
             var markedVertices = new List<GraphNode>();
@@ -274,8 +277,8 @@ namespace CPLEX
                     maxWeightSet = set;
                 }
                 markedVertices.AddRange(set);
-            }
-            return maxWeightSet;
+            }*/
+            return maxWeightedSet;
         }
 
         private static List<Tuple<GraphNode, GraphNode>> GetCliqueDisconnectedEdges(List<GraphNode> clique)
