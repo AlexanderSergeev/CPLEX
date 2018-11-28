@@ -147,7 +147,7 @@ namespace CPLEX
             if (!cplex.Solve()) return;
             var objValue = cplex.GetObjValue();
             // this branch won't give us better result than existing one
-            if (objValue < bestResult || objValue.Almost(bestResult))
+            if (objValue < bestResult + 1)
                 return;
             var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
             // решение целое
@@ -172,7 +172,7 @@ namespace CPLEX
             else
             {
                 // ветвление, если f тоже самое
-                if (objValue.Almost(previousObjValue))
+                if (objValue.Almost(previousObjValue, 0.01))
                 {
                     var constraint = cplex.AddGe(branchingVariable, 1);
                     previousObjValue = objValue;
