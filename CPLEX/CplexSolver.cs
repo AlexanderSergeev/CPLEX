@@ -115,6 +115,8 @@ namespace CPLEX
             }
             maxClique = clique;
             bestResult = clique.Count;
+            Console.WriteLine(bestResult);
+            Console.WriteLine(string.Join(",", maxClique));
         }
 
         private static bool IsClique(List<GraphNode> possibleClique)
@@ -160,6 +162,8 @@ namespace CPLEX
                 {
                     maxClique = possibleClique;
                     bestResult = maxClique.Count;
+                    Console.WriteLine(bestResult);
+                    Console.WriteLine(string.Join(",", maxClique));
                     return;
                 }
                 // найденное решение - не клика
@@ -172,7 +176,7 @@ namespace CPLEX
             else
             {
                 // ветвление, если f тоже самое
-                if (objValue.Almost(previousObjValue, 0.01))
+                if (objValue.Almost(previousObjValue, 0.1))
                 {
                     var constraint = cplex.AddGe(branchingVariable, 1);
                     previousObjValue = objValue;
