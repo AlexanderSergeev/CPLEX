@@ -7,7 +7,7 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var fileName = "hamming8-4.clq.txt";
+        var fileName = "brock200_3.clq.txt";
         if (args.Length > 0)
         {
             fileName = args[0];

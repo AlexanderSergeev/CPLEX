@@ -176,7 +176,7 @@ namespace CPLEX
             else
             {
                 // ветвление, если f тоже самое
-                if (objValue.Almost(previousObjValue, 0.1))
+                if (objValue.Almost(previousObjValue, 0.01))
                 {
                     var constraint = cplex.AddGe(branchingVariable, 1);
                     previousObjValue = objValue;
@@ -255,33 +255,6 @@ namespace CPLEX
                     maxWeight = setWeight;
                 }
             }
-            /*
-            var maxWeightSet = new List<GraphNode>();
-            var maxWeight = 0.0;
-            var markedVertices = new List<GraphNode>();
-
-            while (markedVertices.Count != graphNodes.Count)
-            {
-                var nodes = new List<GraphNode>(graphNodes);
-                var set = new List<GraphNode>();
-                var setWeight = 0.0;
-                nodes.RemoveAll(x => markedVertices.Contains(x));
-
-                while (nodes.Count != 0)
-                {
-                    var sorted = nodes.OrderByDescending(node => weights[graphNodes.IndexOf(node)]);
-                    var v = sorted.FirstOrDefault();
-                    set.Add(v);
-                    setWeight = setWeight + weights[graphNodes.IndexOf(v)];
-                    nodes.RemoveAll(x => x.Index == v.Index || v.Neighbours.Contains(x));
-                }
-                if (setWeight > maxWeight || (setWeight.Almost(maxWeight) && set.Count>maxWeightSet.Count))
-                {
-                    maxWeight = setWeight;
-                    maxWeightSet = set;
-                }
-                markedVertices.AddRange(set);
-            }*/
             return maxWeightedSet;
         }
 
@@ -301,5 +274,12 @@ namespace CPLEX
             }
             return disconnectedEdges;
         }
+
+        /*private static Dictionary<int, HashSet<GraphNode>> GetCliqueIndependentSets(List<GraphNode> clique)
+        {
+            var sets = new Dictionary<int, HashSet<GraphNode>>();
+            // foreach vertex recursion передаем соседей и ее саму
+            // рекурсия => берем вершины, не связанные с текущей, сортируем по-возрастванию => берем вершины, не связанные с текущей, сортируем по-возрастванию
+        }*/
     }
 }
