@@ -162,8 +162,6 @@ namespace CPLEX
                 {
                     maxClique = possibleClique;
                     bestResult = maxClique.Count;
-                    Console.WriteLine(bestResult);
-                    Console.WriteLine(string.Join(",", maxClique));
                     return;
                 }
                 // найденное решение - не клика
@@ -176,7 +174,7 @@ namespace CPLEX
             else
             {
                 // ветвление, если f тоже самое
-                if (objValue.Almost(previousObjValue, 0.01))
+                if (objValue.Almost(previousObjValue, 0.1))
                 {
                     var constraint = cplex.AddGe(branchingVariable, 1);
                     previousObjValue = objValue;
@@ -274,12 +272,5 @@ namespace CPLEX
             }
             return disconnectedEdges;
         }
-
-        /*private static Dictionary<int, HashSet<GraphNode>> GetCliqueIndependentSets(List<GraphNode> clique)
-        {
-            var sets = new Dictionary<int, HashSet<GraphNode>>();
-            // foreach vertex recursion передаем соседей и ее саму
-            // рекурсия => берем вершины, не связанные с текущей, сортируем по-возрастванию => берем вершины, не связанные с текущей, сортируем по-возрастванию
-        }*/
     }
 }

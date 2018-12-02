@@ -20,6 +20,5 @@ public class App
         Console.WriteLine(timer.Elapsed);
         Console.WriteLine(result.Count);
         Console.Write(string.Join(",", result));
-        Console.ReadKey(false);
     }
 }
