@@ -7,7 +7,7 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var fileName = "brock200_3.clq.txt";
+        var fileName = "c-fat200-5.clq.txt";
         if (args.Length > 0)
         {
             fileName = args[0];
@@ -16,9 +16,8 @@ public class App
         var timer = Stopwatch.StartNew();
         var graph = GraphParser.ParseNewGraph(fileName);
         var algorithm = new CplexSolver(graph);
-        var result = algorithm.FindMaxClique();
+        var result = algorithm.FindMaxColorSets();
         Console.WriteLine(timer.Elapsed);
         Console.WriteLine(result.Count);
-        Console.Write(string.Join(",", result));
     }
 }
