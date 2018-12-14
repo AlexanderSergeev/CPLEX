@@ -94,7 +94,7 @@ namespace CPLEX
             // TODO if found set > 1 update objective and constraints
             // TODO else понять нужно ли отбросить ветку
             var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
-            if (branchingVariable==null)
+            if (branchingVariable == null)
             {
                 // TODO update bestResult
                 return;
@@ -136,8 +136,7 @@ namespace CPLEX
                 key++;
                 markedVertices.AddRange(set);
             }
-            // TODO extend sets
-            return sets;
+            return ExtendColorSets(sets);
         }
 
         private static Dictionary<int, HashSet<GraphNode>> GetMaxWeightIndependentSets(List<GraphNode> graphNodes,
@@ -165,8 +164,37 @@ namespace CPLEX
                 key++;
                 markedVertices.AddRange(set);
             }
-            // TODO extend sets
-            return sets;
+            return ExtendColorSets(sets);
+        }
+
+        private static Dictionary<int, HashSet<GraphNode>> ExtendColorSets(Dictionary<int, HashSet<GraphNode>> colorSets)
+        {
+            foreach (var set in colorSets)
+            {
+                foreach (var previousSet in colorSets.Where(x => x.Key < set.Key))
+                {
+                    foreach (var node in previousSet.Value)
+                    {
+                        if (NoConnections(node, set.Value))
+                        {
+                            set.Value.Add(node);
+                        }
+                    }
+                }
+
+            }
+            return colorSets;
+        }
+        private static bool NoConnections(GraphNode node, HashSet<GraphNode> set)
+        {
+            foreach (var setNode in set)
+            {
+                if (setNode.Neighbours.Contains(node))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }
