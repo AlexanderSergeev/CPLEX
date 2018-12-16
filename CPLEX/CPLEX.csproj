@@ -62,6 +62,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="myciel4.col" />
+    <None Include="queen7_7.col" />
+    <None Include="queen8_8.col" />
+    <None Include="queen9_9.col" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="brock200_3.clq.txt" />

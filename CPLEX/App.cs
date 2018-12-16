@@ -7,7 +7,7 @@ public class App
 {
     public static void Main(string[] args)
     {
-        var fileName = "c-fat200-5.clq.txt";
+        var fileName = "myciel4.col";
         if (args.Length > 0)
         {
             fileName = args[0];

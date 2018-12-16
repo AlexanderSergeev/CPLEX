@@ -10,9 +10,10 @@ namespace CPLEX
     {
         private readonly Cplex cplex;
         private readonly NewGraph graph;
-        private INumVar[] numVars;
+        private List<INumVar> numVars;
         private List<IRange> constraints;
         private Dictionary<int, HashSet<GraphNode>> currentColors;
+        private Dictionary<int, HashSet<GraphNode>> excludedSets;
         private Dictionary<int, HashSet<GraphNode>> bestColorSets;
         private int bestResult;
 
@@ -20,6 +21,7 @@ namespace CPLEX
         {
             this.graph = graph;
             bestColorSets = new Dictionary<int, HashSet<GraphNode>>();
+            excludedSets = new Dictionary<int, HashSet<GraphNode>>();
             cplex = new Cplex();
             constraints = new List<IRange>();
             Initialize();
@@ -33,25 +35,25 @@ namespace CPLEX
 
             // get heuristic solution
             var maxSets = GetMaxIndependentSets(new List<GraphNode>(graph.Nodes));
-            bestColorSets = maxSets;
             currentColors = maxSets;
+            bestColorSets = maxSets;
             bestResult = maxSets.Count;
             Console.WriteLine(bestResult);
 
             // initialize set vars
-            numVars = maxSets.Select(set => cplex.NumVar(0, 1, $"x{set.Key}")).ToArray();
+            numVars = maxSets.Select(set => cplex.NumVar(0, 1, $"x{set.Key}")).ToList();
 
             // objective function -> min
-            InitializeObjFunc(numVars);
+            InitializeObjFunc();
 
             // add constraints based on max independent sets
             InitializeConstraints(maxSets);
         }
 
-        private void InitializeObjFunc(IEnumerable<INumVar> vars)
+        private void InitializeObjFunc()
         {
             var func = cplex.LinearNumExpr();
-            foreach (var x in vars)
+            foreach (var x in numVars)
                 func.AddTerm(1, x);
             cplex.Remove(cplex.GetObjective());
             cplex.AddMinimize(func);
@@ -59,6 +61,8 @@ namespace CPLEX
 
         private void InitializeConstraints(Dictionary<int, HashSet<GraphNode>> independentSets)
         {
+            cplex.Remove(constraints.ToArray());
+            constraints = new List<IRange>();
             foreach (var node in graph.Nodes)
             {
                 var numExpr = cplex.NumExpr();
@@ -72,6 +76,17 @@ namespace CPLEX
                 }
                 constraints.Add(cplex.AddGe(numExpr, 1));
             }
+        }
+
+        private void UpdateModel(Dictionary<int, HashSet<GraphNode>> independentSets)
+        {
+            foreach (var set in independentSets)
+            {
+                currentColors.Add(set.Key, set.Value);
+                numVars.Add(cplex.NumVar(0, 1, $"x{set.Key}"));
+            }
+            InitializeObjFunc();
+            InitializeConstraints(currentColors);
         }
 
         public Dictionary<int, HashSet<GraphNode>> FindMaxColorSets()
@@ -89,27 +104,56 @@ namespace CPLEX
             // TODO* if same value => decide if needs branching
             var weights = constraints.Select(constraint => cplex.GetDual(constraint)).ToArray();
             var maxWeightedSets = GetMaxWeightIndependentSets(graph.Nodes, weights);
-            // TODO if found update objective and constraints
-            FindMaxColorSetsInternal();
-            // TODO else solve CGP exact
-            // TODO if found update objective and constraints
-            // TODO else понять нужно ли отбросить ветку
-            var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
-            if (branchingVariable == null)
+            if (maxWeightedSets.Count > 0)
             {
-                // TODO update bestResult
-                return;
+                UpdateModel(maxWeightedSets);
+                FindMaxColorSetsInternal();
             }
             else
             {
-                // TODO do branching 
-                var constraint = cplex.AddGe(branchingVariable, 1);
-                FindMaxColorSetsInternal();
-                cplex.Remove(constraint);
-                // TODO exclude branchingVariable set
-                constraint = cplex.AddLe(branchingVariable, 0);
-                FindMaxColorSetsInternal();
-                cplex.Remove(constraint);
+                // TODO solve CGP exact
+                // TODO if found update objective and constraints
+                // TODO else понять нужно ли отбросить ветку
+                var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
+                if (branchingVariable == null)
+                {
+                    if (objValue < bestResult)
+                    {
+                        var result = new Dictionary<int, HashSet<GraphNode>>();
+                        var variables = numVars.Where(var => cplex.GetValue(var) == 1);
+                        foreach (var variable in variables)
+                        {
+                            var key = int.Parse(variable.Name.Substring(1));
+                            HashSet<GraphNode> set;
+                            currentColors.TryGetValue(key, out set);
+                            result.Add(key, set);
+                        }
+                        bestColorSets = result;
+                        bestResult = result.Count;
+                        Console.WriteLine(bestResult);
+                    }
+                    return;
+                }
+                else
+                {
+                    var branchingVariables = numVars.Where(var => !cplex.GetValue(var).IsInteger());
+                    branchingVariable = branchingVariables.FirstOrDefault(var => cplex.GetValue(var) == branchingVariables.Max(x => cplex.GetValue(x)));
+                    var constraint = cplex.AddGe(branchingVariable, 1);
+                    constraints.Add(constraint);
+                    FindMaxColorSetsInternal();
+                    cplex.Remove(constraint);
+                    constraints.Remove(constraint);
+
+                    constraint = cplex.AddLe(branchingVariable, 0);
+                    constraints.Add(constraint);
+                    var excludedSet = currentColors.FirstOrDefault(set => "x" + set.Key.ToString() == branchingVariable.Name);
+                    excludedSets.Add(excludedSet.Key, excludedSet.Value);
+                    // TODO exclude branchingVariable set
+                    FindMaxColorSetsInternal();
+                    cplex.Remove(constraint);
+                    constraints.Remove(constraint);
+                    excludedSets.Remove(excludedSet.Key);
+                }
             }
         }
 
@@ -140,12 +184,11 @@ namespace CPLEX
             return ExtendColorSets(sets);
         }
 
-        private static Dictionary<int, HashSet<GraphNode>> GetMaxWeightIndependentSets(List<GraphNode> graphNodes,
-            double[] weights)
+        private Dictionary<int, HashSet<GraphNode>> GetMaxWeightIndependentSets(List<GraphNode> graphNodes, double[] weights)
         {
             var sets = new Dictionary<int, HashSet<GraphNode>>();
             var markedVertices = new List<GraphNode>();
-            var key = 1;
+            var key = currentColors.Count + 1;
             var sorted = new List<GraphNode>(graphNodes.OrderByDescending(node => weights[graphNodes.IndexOf(node)]));
 
             while (markedVertices.Count != graphNodes.Count)
@@ -190,6 +233,7 @@ namespace CPLEX
             }
             return colorSets;
         }
+
         private static bool NoConnections(GraphNode node, HashSet<GraphNode> set)
         {
             foreach (var setNode in set)
