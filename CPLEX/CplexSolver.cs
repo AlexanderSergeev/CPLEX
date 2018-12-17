@@ -131,7 +131,8 @@ namespace CPLEX
                             foreach (var variable in variables)
                             {
                                 var key = int.Parse(variable.Name.Substring(1));
-                                currentColors.TryGetValue(key, out HashSet<GraphNode> set);
+                                HashSet<GraphNode> set;
+                                currentColors.TryGetValue(key, out set);
                                 result.Add(key, set);
                             }
                             bestColorSets = result;
@@ -269,32 +270,29 @@ namespace CPLEX
         private Dictionary<int, HashSet<GraphNode>> SolveCGPWithCplex(List<GraphNode> graphNodes, double[] weights)
         {
             var cgpCplex = new Cplex();
-            // TODO solve CGP exact
-
-            var vars = new List<INumVar>();
+            var vars = new List<IIntVar>();
             var func = cgpCplex.LinearNumExpr();
             foreach (var node in graphNodes)
             {
-                var newVar = cgpCplex.NumVar(0, 1, $"{node}n");
+                var newVar = cgpCplex.IntVar(0, 1, $"{node}n");
                 vars.Add(newVar);
                 func.AddTerm(weights[graphNodes.IndexOf(node)], newVar);
             }
             cgpCplex.AddMaximize(func);
-            /*foreach (var node in graphNodes)
+
+            foreach (var node in graphNodes)
             {
-                for (var anotherNodeIndex = node.Index + 1;
-                    anotherNodeIndex <= graphNodes.Count;
-                    anotherNodeIndex++)
+                foreach (var neighbour in node.Neighbours)
                 {
-                    var anotherNodeValue = graph.Nodes.First(n => n.Index == anotherNodeIndex);
-                    if (!node.Neighbours.Contains(anotherNodeValue))
-                    {
-                        var indexVar = vars[node.Index - 1];
-                        var anotherNodeIndexVar = vars[anotherNodeIndex - 1];
-                        cplex.AddLe(cplex.Sum(indexVar, anotherNodeIndexVar), 1);
-                    }
+                    var indexVar = vars[graphNodes.IndexOf(node)];
+                    var neighbourIndexVar = vars[graphNodes.IndexOf(neighbour)];
+                    cgpCplex.AddLe(cplex.Sum(indexVar, neighbourIndexVar), 1);
                 }
-            }*/
+            }
+            cgpCplex.SetParam(Cplex.LongParam.IntSolLim, 1);
+            /*if (!cgpCplex.Solve()) return null;
+            var objValue = cgpCplex.GetObjValue();
+            var variables = vars.Where(var => cgpCplex.GetValue(var) == 1);*/
             cgpCplex.End();
             return null;
         }
