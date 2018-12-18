@@ -16,6 +16,7 @@ namespace CPLEX
         private Dictionary<int, HashSet<GraphNode>> excludedSets;
         private Dictionary<int, HashSet<GraphNode>> bestColorSets;
         private int bestResult;
+        private double previousObjValue;
 
         public CplexSolver(NewGraph graph)
         {
@@ -107,6 +108,7 @@ namespace CPLEX
             if (maxWeightedSets.Count > 0)
             {
                 UpdateModel(maxWeightedSets);
+                previousObjValue = objValue;
                 FindMaxColorSetsInternal();
             }
             else
@@ -120,6 +122,7 @@ namespace CPLEX
                     var key = currentColors.Last().Key + 1;
                     sets.Add(key, maxWeightedSet);
                     UpdateModel(sets);
+                    previousObjValue = objValue;
                     FindMaxColorSetsInternal();
                 }
                 else
@@ -145,13 +148,14 @@ namespace CPLEX
                     }
                     else
                     {
-                        if (objValue < bestResult && !objValue.Almost(bestResult))
+                        if (objValue < bestResult && !objValue.Almost(bestResult) && previousObjValue != objValue)
                         {
                             var branchingVariables = numVars.Where(var => !cplex.GetValue(var).IsInteger());
                             branchingVariable = branchingVariables.FirstOrDefault(var =>
                                 cplex.GetValue(var) == branchingVariables.Max(x => cplex.GetValue(x)));
                             var constraint = cplex.AddEq(branchingVariable, 1);
                             constraints.Add(constraint);
+                            previousObjValue = objValue;
                             FindMaxColorSetsInternal();
                             cplex.Remove(constraint);
                             constraints.Remove(constraint);
@@ -164,6 +168,7 @@ namespace CPLEX
                             {
                                 excludedSets.Add(excludedSet.Key, excludedSet.Value);
                             }
+                            previousObjValue = objValue;
                             FindMaxColorSetsInternal();
                             cplex.Remove(constraint);
                             constraints.Remove(constraint);
@@ -249,9 +254,17 @@ namespace CPLEX
         private Dictionary<int, HashSet<GraphNode>> ExtendColorSets(Dictionary<int, HashSet<GraphNode>> colorSets)
         {
             var resultSets = new Dictionary<int, HashSet<GraphNode>>();
+            //var extendedSets = new Dictionary<int, HashSet<GraphNode>>();
+            /*foreach (var set in colorSets)
+            {
+                var extendedSet = ExtendColorSet(set.Value);
+                if (extendedSet != null)
+                {
+                    extendedSets.Add(set.Key, extendedSet);
+                }
+            }*/
             foreach (var set in colorSets)
             {
-                //var extendedSet = ExtendColorSet(set.Value, false);
                 // TODO* нужно ли where?
                 foreach (var previousSet in colorSets.Where(x => x.Key < set.Key))
                 {
@@ -306,7 +319,7 @@ namespace CPLEX
         {
             foreach (var setNode in set)
             {
-                if (setNode.Neighbours.Contains(node) || setNode.Index==node.Index)
+                if (setNode.Neighbours.Contains(node) || setNode.Index == node.Index)
                 {
                     return false;
                 }
@@ -327,9 +340,18 @@ namespace CPLEX
             foreach (var node in candidates)
             {
                 var newCandidates = candidates.Where(x => !node.Neighbours.Contains(x) && x.Index != node.Index).ToList();
-                solution.Add(node);
-                solutionWeight = solutionWeight + weights[graph.Nodes.IndexOf(node)];
-                return SolveCgpExact(newCandidates, weights, solution, solutionWeight);
+                var newSolution = new HashSet<GraphNode>(solution);
+                newSolution.Add(node);
+                if (newSolution.Where(x => x.Index == 20).Count() != 0 && newSolution.Where(x => x.Index == 1).Count() != 0)
+                {
+                    var a = 5;
+                }
+                var newSolutionWeight = solutionWeight + weights[graph.Nodes.IndexOf(node)];
+                var result = SolveCgpExact(newCandidates, weights, newSolution, newSolutionWeight);
+                if (result != null)
+                {
+                    return result;
+                }
             }
             return null;
         }
