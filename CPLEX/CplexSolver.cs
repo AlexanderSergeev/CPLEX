@@ -150,13 +150,13 @@ namespace CPLEX
                             var branchingVariables = numVars.Where(var => !cplex.GetValue(var).IsInteger());
                             branchingVariable = branchingVariables.FirstOrDefault(var =>
                                 cplex.GetValue(var) == branchingVariables.Max(x => cplex.GetValue(x)));
-                            var constraint = cplex.AddGe(branchingVariable, 1);
+                            var constraint = cplex.AddEq(branchingVariable, 1);
                             constraints.Add(constraint);
                             FindMaxColorSetsInternal();
                             cplex.Remove(constraint);
                             constraints.Remove(constraint);
 
-                            constraint = cplex.AddLe(branchingVariable, 0);
+                            constraint = cplex.AddEq(branchingVariable, 0);
                             constraints.Add(constraint);
                             var excludedSet =
                                 currentColors.FirstOrDefault(set => "x" + set.Key.ToString() == branchingVariable.Name);
