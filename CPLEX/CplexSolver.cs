@@ -32,8 +32,6 @@ namespace CPLEX
 
         private void Initialize()
         {
-            cplex.SetOut(null);
-
             // get heuristic solution
             var maxSets = GetMaxIndependentSets(new List<GraphNode>(graph.Nodes));
             currentColors = maxSets;
@@ -109,18 +107,30 @@ namespace CPLEX
 
             // TODO* if same value => decide if needs branching
             var weights = constraints.Select(constraint => cplex.GetDual(constraint)).ToArray();
-            var maxWeightedSets = GetMaxWeightIndependentSets(graph.Nodes, weights);
+            var sortedNodes = new List<GraphNode>(graph.Nodes.OrderByDescending(node => weights[graph.Nodes.IndexOf(node)]));
+            var maxWeightedSet = GetMaxWeightIndependentSet(sortedNodes, weights);
+            if (maxWeightedSet != null)
+            {
+                var sets = new Dictionary<int, HashSet<GraphNode>>();
+                var key = currentColors.Last().Key + 1;
+                sets.Add(key, maxWeightedSet);
+                UpdateModel(sets);
+                previousObjValue = objValue;
+                FindMaxColorSetsInternal();
+            }
+            /*var maxWeightedSets = GetMaxWeightIndependentSets(graph.Nodes, weights);
             if (maxWeightedSets.Count > 0)
             {
                 UpdateModel(maxWeightedSets);
                 previousObjValue = objValue;
                 FindMaxColorSetsInternal();
-            }
+            }*/
             else
             {
                 // solve CGP exact
-                var sortedNodes = new List<GraphNode>(graph.Nodes.Where(x => weights[graph.Nodes.IndexOf(x)] > 0).OrderByDescending(node => weights[graph.Nodes.IndexOf(node)]));
-                HashSet<GraphNode> exactMaxWeightedSet = GetMaxWeightIndependentSet(sortedNodes, weights);
+                //var sortedNodes = new List<GraphNode>(graph.Nodes);
+                var exactMaxWeightedSet = SolveCGPWithCplex(graph.Nodes, weights);
+                //var exactMaxWeightedSet = GetMaxWeightIndependentSet(sortedNodes, weights);
                 if (exactMaxWeightedSet != null)
                 {
                     var sets = new Dictionary<int, HashSet<GraphNode>>();
@@ -138,7 +148,7 @@ namespace CPLEX
                         if (objValue < bestResult && !objValue.Almost(bestResult))
                         {
                             var result = new Dictionary<int, HashSet<GraphNode>>();
-                            var variables = numVars.Where(var => cplex.GetValue(var) == 1);
+                            var variables = numVars.Where(var => cplex.GetValue(var).Almost(1));
                             foreach (var variable in variables)
                             {
                                 var key = int.Parse(variable.Name.Substring(1));
@@ -377,10 +387,6 @@ namespace CPLEX
                 var newCandidates = candidates.Where(x => !node.Neighbours.Contains(x) && x.Index != node.Index).ToList();
                 var newSolution = new HashSet<GraphNode>(solution);
                 newSolution.Add(node);
-                if (newSolution.Where(x => x.Index == 20).Count() != 0 && newSolution.Where(x => x.Index == 1).Count() != 0)
-                {
-                    var a = 5;
-                }
                 var newSolutionWeight = solutionWeight + weights[graph.Nodes.IndexOf(node)];
                 var result = SolveCgpExact(newCandidates, weights, newSolution, newSolutionWeight);
                 if (result != null)
@@ -391,14 +397,14 @@ namespace CPLEX
             return null;
         }
 
-        private double SolveCGPWithCplex(List<GraphNode> graphNodes, double[] weights)
+        private HashSet<GraphNode> SolveCGPWithCplex(List<GraphNode> graphNodes, double[] weights)
         {
             var cgpCplex = new Cplex();
             var vars = new List<IIntVar>();
             var func = cgpCplex.LinearNumExpr();
             foreach (var node in graphNodes)
             {
-                var newVar = cgpCplex.IntVar(0, 1, $"{node}n");
+                var newVar = cgpCplex.BoolVar($"n{node}");
                 vars.Add(newVar);
                 func.AddTerm(weights[graph.Nodes.IndexOf(node)], newVar);
             }
@@ -406,19 +412,40 @@ namespace CPLEX
 
             foreach (var node in graphNodes)
             {
-                foreach (var neighbour in node.Neighbours.Where(x => graphNodes.Contains(x)))
+                foreach (var neighbour in node.Neighbours)
                 {
                     var indexVar = vars[graphNodes.IndexOf(node)];
                     var neighbourIndexVar = vars[graphNodes.IndexOf(neighbour)];
                     cgpCplex.AddLe(cplex.Sum(indexVar, neighbourIndexVar), 1);
                 }
             }
-            //cgpCplex.SetParam(Cplex.LongParam.IntSolLim, 1);
+            foreach (var excludedSet in excludedSets)
+            {
+                var numExpr = cplex.NumExpr();
+                foreach (var node in excludedSet.Value)
+                {
+                    var curVar = vars[graphNodes.IndexOf(node)];
+                    numExpr = cplex.Sum(numExpr, curVar);
+                }
+                cgpCplex.AddLe(numExpr, excludedSet.Value.Count - 1);
+            }
+
+            cgpCplex.SetOut(null);
             cgpCplex.Solve();
             var objValue = cgpCplex.GetObjValue();
-            var variables = vars.Where(var => cgpCplex.GetValue(var) == 1);
+            if (objValue > 1 && !objValue.Almost(1))
+            {
+                var result = new HashSet<GraphNode>();
+                var variables = vars.Where(var => cgpCplex.GetValue(var).Almost(1));
+                foreach (var variable in variables)
+                {
+                    result.Add(graphNodes.FirstOrDefault(x=>x.Index == int.Parse(variable.Name.Substring(1))));
+                }
+                cgpCplex.End();
+                return ExtendColorSet(result, false);
+            }
             cgpCplex.End();
-            return objValue;
+            return null;
         }
     }
 }
