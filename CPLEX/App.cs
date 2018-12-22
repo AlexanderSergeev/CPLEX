@@ -19,6 +19,9 @@ public class App
         var result = algorithm.FindMaxColorSets();
         Console.WriteLine(timer.Elapsed);
         Console.WriteLine(result.Count);
-        Console.ReadKey(false);
+        foreach (var set in result)
+        {
+            Console.WriteLine(string.Join(",", set.Value));
+        }
     }
 }
