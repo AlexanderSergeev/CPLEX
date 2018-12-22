@@ -132,7 +132,7 @@ namespace CPLEX
                     }
                     else
                     {
-                        if (objValue > bestResult || objValue.Almost(bestResult) || previousObjValue.Almost(objValue))
+                        if (objValue > bestResult || objValue.Almost(bestResult))
                         {
                             return;
                         }
@@ -153,7 +153,7 @@ namespace CPLEX
                             bestResult = result.Count;
                             Console.WriteLine(bestResult);
                         }
-                        else
+                        else if (!previousObjValue.Almost(objValue))
                         {
                             Branch(objValue);
                         }
@@ -263,28 +263,28 @@ namespace CPLEX
             var resultSets = new Dictionary<int, HashSet<GraphNode>>();
             foreach (var set in colorSets)
             {
-                //var extendedSet = ExtendColorSet(set.Value);
-                //if (extendedSet != null)
-                //{
-                foreach (var previousSet in colorSets.Where(x => x.Key < set.Key))
+                var extendedSet = ExtendColorSet(set.Value);
+                if (extendedSet != null)
                 {
-                    foreach (var node in previousSet.Value)
+                    foreach (var previousSet in colorSets.Where(x => x.Key < set.Key))
                     {
-                        if (NoConnections(node, set.Value))
+                        foreach (var node in previousSet.Value)
                         {
-                            set.Value.Add(node);
+                            if (NoConnections(node, extendedSet))
+                            {
+                                extendedSet.Add(node);
+                            }
+                        }
+                    }
+                    resultSets.Add(set.Key, extendedSet);
+                    foreach (var excludedSet in excludedSets)
+                    {
+                        if (extendedSet.SetEquals(excludedSet))
+                        {
+                            resultSets.Remove(set.Key);
                         }
                     }
                 }
-                resultSets.Add(set.Key, set.Value);
-                foreach (var excludedSet in excludedSets)
-                {
-                    if (set.Value.SetEquals(excludedSet))
-                    {
-                        resultSets.Remove(set.Key);
-                    }
-                }
-                //}
             }
             return resultSets;
         }
