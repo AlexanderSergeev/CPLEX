@@ -40,6 +40,12 @@ namespace CPLEX
             bestColorSets = new Dictionary<int, HashSet<GraphNode>>(maxSets);
             bestResult = maxSets.Count;
             Console.WriteLine(bestResult);
+            var output = new List<string>();
+            foreach (var set in maxSets)
+            {
+                output.Add(string.Join(",", set.Value));
+            }
+            Console.WriteLine(string.Join(";", output));
 
             // initialize set vars
             numVars = maxSets.Select(set => cplex.NumVar(0, 1, $"x{set.Key}")).ToList();
@@ -152,6 +158,12 @@ namespace CPLEX
                             bestColorSets = result;
                             bestResult = result.Count;
                             Console.WriteLine(bestResult);
+                            var output = new List<string>();
+                            foreach (var set in result)
+                            {
+                                output.Add(string.Join(",", set.Value));
+                            }
+                            Console.WriteLine(string.Join(";", output));
                         }
                         else if (!previousObjValue.Almost(objValue))
                         {

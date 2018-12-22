@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using MaxClique;
 using CPLEX;
+using System.Collections.Generic;
 
 public class App
 {
@@ -16,12 +17,14 @@ public class App
         var timer = Stopwatch.StartNew();
         var graph = GraphParser.ParseNewGraph(fileName);
         var algorithm = new CplexSolver(graph);
-        var result = algorithm.FindMaxColorSets();
+        var colors = algorithm.FindMaxColorSets();
         Console.WriteLine(timer.Elapsed);
-        Console.WriteLine(result.Count);
-        foreach (var set in result)
+        Console.WriteLine(colors.Count);
+        var result = new List<string>();
+        foreach (var set in colors)
         {
-            Console.WriteLine(string.Join(",", set.Value));
+            result.Add(string.Join(",", set.Value));
         }
+        Console.Write(string.Join(";", result));
     }
 }
