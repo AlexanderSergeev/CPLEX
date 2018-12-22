@@ -13,16 +13,16 @@ namespace CPLEX
         private List<INumVar> numVars;
         private List<IRange> constraints;
         private Dictionary<int, HashSet<GraphNode>> currentColors;
-        private Dictionary<int, HashSet<GraphNode>> excludedSets;
+        private List<HashSet<GraphNode>> excludedSets;
         private Dictionary<int, HashSet<GraphNode>> bestColorSets;
         private int bestResult;
-        //private double previousObjValue;
+        private double previousObjValue;
 
         public CplexSolver(NewGraph graph)
         {
             this.graph = graph;
             bestColorSets = new Dictionary<int, HashSet<GraphNode>>();
-            excludedSets = new Dictionary<int, HashSet<GraphNode>>();
+            excludedSets = new List<HashSet<GraphNode>>();
             cplex = new Cplex();
             constraints = new List<IRange>();
             Initialize();
@@ -111,28 +111,28 @@ namespace CPLEX
                 var key = currentColors.Last().Key + 1;
                 sets.Add(key, maxWeightedSet);
                 UpdateModel(sets);
-                //previousObjValue = objValue;
+                previousObjValue = objValue;
                 FindMaxColorSetsInternal();
             }*/
             var maxWeightedSets = GetMaxWeightIndependentSets(graph.Nodes, weights);
             if (maxWeightedSets.Count > 0)
             {
                 UpdateModel(maxWeightedSets);
-                //previousObjValue = objValue;
+                previousObjValue = objValue;
                 FindMaxColorSetsInternal();
             }
             else
             {
                 var branchingVariable = numVars.FirstOrDefault(var => !cplex.GetValue(var).IsInteger());
-                if (objValue < bestResult && !objValue.Almost(bestResult) && branchingVariable != null)
+                if (objValue < bestResult && !objValue.Almost(bestResult) && !previousObjValue.Almost(objValue) &&  branchingVariable != null)
                 {
-                    Branch();
+                    Branch(objValue);
                 }
                 else
                 {
-                    // solve CGP exact
-                    //var sortedNodes = new List<GraphNode>(graph.Nodes);
-                    var exactMaxWeightedSet = SolveCGPWithCplex(graph.Nodes, weights);
+                // solve CGP exact
+                //var sortedNodes = new List<GraphNode>(graph.Nodes);
+                var exactMaxWeightedSet = SolveCGPWithCplex(graph.Nodes, weights);
                     //var exactMaxWeightedSet = GetMaxWeightIndependentSet(sortedNodes, weights);
                     if (exactMaxWeightedSet != null)
                     {
@@ -140,12 +140,12 @@ namespace CPLEX
                         var key = currentColors.Last().Key + 1;
                         sets.Add(key, exactMaxWeightedSet);
                         UpdateModel(sets);
-                        //previousObjValue = objValue;
+                        previousObjValue = objValue;
                         FindMaxColorSetsInternal();
                     }
                     else
                     {
-                        if (objValue > bestResult || objValue.Almost(bestResult))
+                        if (objValue > bestResult || objValue.Almost(bestResult) || previousObjValue.Almost(objValue))
                         {
                             return;
                         }
@@ -168,21 +168,21 @@ namespace CPLEX
                         }
                         else
                         {
-                            Branch();
+                            Branch(objValue);
                         }
                     }
-                }
+               }
             }
         }
 
-        private void Branch()
+        private void Branch(double objValue)
         {
             var branchingVariables = numVars.Where(var => !cplex.GetValue(var).IsInteger());
             var branchingVariable = branchingVariables.FirstOrDefault(var =>
                 cplex.GetValue(var) == branchingVariables.Max(x => cplex.GetValue(x)));
             var constraint = cplex.AddEq(branchingVariable, 1);
             constraints.Add(constraint);
-            //previousObjValue = objValue;
+            previousObjValue = objValue;
             FindMaxColorSetsInternal();
             cplex.Remove(constraint);
             constraints.Remove(constraint);
@@ -191,15 +191,12 @@ namespace CPLEX
             constraints.Add(constraint);
             var excludedSet =
                 currentColors.FirstOrDefault(set => "x" + set.Key.ToString() == branchingVariable.Name);
-            if (!excludedSets.ContainsKey(excludedSet.Key))
-            {
-                excludedSets.Add(excludedSet.Key, excludedSet.Value);
-            }
-            //previousObjValue = objValue;
+            excludedSets.Add(excludedSet.Value);
+            previousObjValue = objValue;
             FindMaxColorSetsInternal();
             cplex.Remove(constraint);
             constraints.Remove(constraint);
-            excludedSets.Remove(excludedSet.Key);
+            excludedSets.Remove(excludedSet.Value);
         }
 
 
@@ -308,36 +305,37 @@ namespace CPLEX
         private Dictionary<int, HashSet<GraphNode>> ExtendColorSets(Dictionary<int, HashSet<GraphNode>> colorSets)
         {
             var resultSets = new Dictionary<int, HashSet<GraphNode>>();
-            //var extendedSets = new Dictionary<int, HashSet<GraphNode>>();
-            /*foreach (var set in colorSets)
+            /*var extendedSets = new Dictionary<int, HashSet<GraphNode>>();
+            foreach (var set in colorSets)
             {
-                var extendedSet = ExtendColorSet(set.Value);
-                if (extendedSet != null)
-                {
-                    extendedSets.Add(set.Key, extendedSet);
-                }
+                var extendedSet = ExtendColorSet(set.Value, false);
+                extendedSets.Add(set.Key, extendedSet);
             }*/
             foreach (var set in colorSets)
             {
-                // TODO* нужно ли where?
-                foreach (var previousSet in colorSets.Where(x => x.Key < set.Key))
-                {
-                    foreach (var node in previousSet.Value)
+                //var extendedSet = ExtendColorSet(set.Value);
+                //if (extendedSet != null)
+                //{
+                    // TODO* нужно ли where?
+                    foreach (var previousSet in colorSets.Where(x => x.Key < set.Key))
                     {
-                        if (NoConnections(node, set.Value))
+                        foreach (var node in previousSet.Value)
                         {
+                            if (NoConnections(node, set.Value))
+                            {
                             set.Value.Add(node);
+                            }
                         }
                     }
-                }
-                resultSets.Add(set.Key, set.Value);
-                foreach (var excludedSet in excludedSets)
-                {
-                    if (set.Value.SetEquals(excludedSet.Value))
+                    resultSets.Add(set.Key, set.Value);
+                    foreach (var excludedSet in excludedSets)
                     {
-                        resultSets.Remove(set.Key);
+                        if (set.Value.SetEquals(excludedSet))
+                        {
+                            resultSets.Remove(set.Key);
+                        }
                     }
-                }
+                //}
             }
             return resultSets;
         }
@@ -359,7 +357,7 @@ namespace CPLEX
             {
                 foreach (var excludedSet in excludedSets)
                 {
-                    if (colorSet.SetEquals(excludedSet.Value))
+                    if (colorSet.SetEquals(excludedSet))
                     {
                         return null;
                     }
@@ -431,12 +429,12 @@ namespace CPLEX
             foreach (var excludedSet in excludedSets)
             {
                 var numExpr = cplex.NumExpr();
-                foreach (var node in excludedSet.Value)
+                foreach (var node in excludedSet)
                 {
                     var curVar = vars[graphNodes.IndexOf(node)];
                     numExpr = cplex.Sum(numExpr, curVar);
                 }
-                cgpCplex.AddLe(numExpr, excludedSet.Value.Count - 1);
+                cgpCplex.AddLe(numExpr, excludedSet.Count - 1);
             }
 
             cgpCplex.SetOut(null);
